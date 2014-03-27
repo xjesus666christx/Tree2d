@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html>
+	<head><script src="classes.js"></script></head>
+	<body onselectstart="return false"  oncontextmenu="return false">
+		<div style="min-width:960px;width:77%;height:640px;overflow:scroll;float:left;border:1px solid black">
+			<canvas id="myCanvas" width="512" height="512" style="border:1px solid #999999;">
+				Your browser does not support the HTML5 canvas tag.
+			</canvas>
+		</div>
+		<div style="min-width:260px;width:22%;height:640px;valign:top;float:left;border:1px solid black">
+			<input type="button" value="Save"  onclick="console.log(JSON.stringify(Tree2d.clean(Tree2d.copy(Tree2d.root))))" style="width:33%" />
+			<input type="button" value="Load" style="width:33%" />
+			<input type="button" id="runBtn" value="Run" style="width:32%" />
+			<select id="hierarhy" style="width:100%" onchange="select(this.value)"></select>
+			<div id="info" style="width:100%;height:30%;overflow:scroll;border:1px solid red"></div>
+			<div id="assets" style="width:100%;height:45%;overflow-y:scroll;border:1px solid black"></div>
+			<input type="file" id="files" name="files[]" multiple />
+		</div>
+		<script>{
+			var canvas, ctx, selected, run = false;
+			
+			var Tree2d = {
+				root: {x:0, y:0, r:0, zx:1, zy:1, a:1, id:0, name:'root'},
+				cid: 1,
+				
+				genId: function() {
+					return Tree2d.cid++;
+				},
+				
+				copy: function(node) {
+					var copy = {};
+					for (i in node) {
+						if (typeof node[i] === 'function' || typeof node[i] === 'object' || i == 'id') {
+						} else {
+							copy[i] = node[i];
+						}
+					}
+					if (node && node.c) {
+						copy.c = [];
+						for (i in node.c) {
+							copy.c[i] = Tree2d.copy(node.c[i]);
+						}
+					}
+					return copy;
+				},
+				
+				init: function(node) {
+					if (!node.x) node.x = 0;
+					if (!node.y) node.y = 0;
+					if (!node.r) node.r = 0;
+					if (!node.zx) node.zx = 1;
+					if (!node.zy) node.zy = 1;
+					if (!node.a) node.a = 1;
+					if (!node.id) node.id = Tree2d.genId();
+					if (node.class) {
+						var f = eval(node.class);
+						f(node);
+					}
+					if (node.c) {
+						var prev;
+						for (i in node.c) {
+							var val = node.c[i];
+							if (!prev) node.child = val;
+							else prev.next = val;
+							prev = val;
+							Tree2d.init(val);
+						}
+					}
+				},
+				
+				clean: function(node) {
+					if (node.x == 0) delete node.x;
+					if (node.y == 0) delete node.y;
+					if (node.r == 0) delete node.r;
+					if (node.zx == 1) delete node.zx;
+					if (node.zy == 1) delete node.zy;
+					if (node.a == 1) delete node.a;
+					if (node.id) delete node.id;
+					for (i in node) {
+						if (i != 'c' && typeof node[i] === 'object') {
+							node[i] = 0;
+							delete node[i];
+						}
+					}
+					for (i in node.c) Tree2d.clean(node.c[i]);
+					return node;
+				},
+				
+				add: function(parent, node) {
+					node = Tree2d.copy(node) || {};
+					
+					if (!parent.c) parent.c = [];
+					parent.c.push(node);
+					node.parent = parent;
+					
+					if (!parent.child) {
+						parent.child = node;
+					} else {
+						var c = parent.child;
+						while (c.next) c = c.next;
+						c.next = node;
+					}
+					Tree2d.init(node);
+					
+					return node;
+				},
+				
+				del: function(node) {
+					var parent = node.parent;
+					if (parent) {
+						for (i in parent.c) {
+							if (parent.c[i] == node) {
+								parent.c[i] = 0;
+								delete parent.c[i];
+								break;
+							}
+						}
+						if (parent.child == node) {
+							parent.child = node.next;
+						} else {
+							var c = parent.child;
+							while (c.next && c.next != node) c = c.next;
+							c.next = node.next;
+						}
+					}
+				},
+				
+				cycle: function() {
+					var n = Tree2d.root;
+					ctx.fillRect(0, 0, canvas.width, canvas.height);
+					ctx.translate(canvas.width / 2, canvas.height / 2);
+					while (n) {
+						ctx.save();
+						ctx.translate(n.x, n.y);
+						ctx.rotate(n.r / 180 * Math.PI);
+						ctx.scale(n.zx, n.zy);
+						if (n.a) {
+							if (n.update) n.update(n);
+							if (n.draw) n.draw(n);
+						}
+						
+						if (n.a && n.child) {
+							n = n.child;
+						} else {
+							while (n) {
+								ctx.restore();
+								if (n.next) {
+									n = n.next;
+									break;
+								}
+								n = n.parent;
+							}
+						}
+					}
+					ctx.translate(-canvas.width / 2, -canvas.height / 2);
+				},
+				
+				findById: function(id) {
+					var n = Tree2d.root;
+					
+					while (n) {
+						if (n.id == id) {
+							return n;
+						} else if (n.child) {
+							n = n.child;
+						} else {
+							while (n) {
+								if (n.next) {
+									n = n.next;
+									break;
+								}
+								n = n.parent;
+							}
+						}
+					}
+				},
+				
+				findByName: function(name) {
+					var n = Tree2d.root;
+					
+					while (n) {
+						if (n.name == name) {
+							return n;
+						} else if (n.child) {
+							n = n.child;
+						} else {
+							while (n) {
+								if (n.next) {
+									n = n.next;
+									break;
+								}
+								n = n.parent;
+							}
+						}
+					}
+				},
+				
+				getScreenTransform: function(node) {
+					var trans = {x:0,y:0,zx:1,zy:1,r:0};
+					var parent = node.parent;
+					var x = node.x, y = node.y;
+					var r = node.r;
+					var zx = node.zx, zy = node.zy;
+					
+					while (parent) {
+						var si = Math.sin(parent.r * Math.PI / 180);
+						var co = Math.cos(parent.r * Math.PI / 180);
+						trans.x = parent.x + (x*parent.zx*co - y*parent.zy*si);
+						trans.y = parent.y + (x*parent.zx*si + y*parent.zy*co);
+						trans.r = parent.r + r;
+						trans.zx = parent.zx * zx;
+						trans.zy = parent.zy * zy;
+						
+						x = trans.x;
+						y = trans.y;
+						r = trans.r;
+						zx = trans.zx;
+						zy = trans.zy;
+						
+						parent = parent.parent;
+					}
+					
+					return trans;
+				},
+				
+				convertPointToNodeTransform: function(node, pos) {
+					var t = Tree2d.getScreenTransform(node);
+					var dx = pos.x - t.x;
+					var dy = pos.y - t.y;
+					var d = Math.sqrt(dx * dx + dy * dy);
+					var r = Math.atan2(dy, dx) / Math.PI * 180;
+					var si = Math.sin((t.r-r) * Math.PI / 180);
+					var co = Math.cos((t.r-r) * Math.PI / 180);
+					var x = d * co;
+					var y = d * si;
+					return {x:x / t.zx, y:-y / t.zy};
+				},
+				
+				getClickedObject: function(pos) {
+					var n = Tree2d.root;
+					var arr = [];
+					
+					while (n) {
+						if (n.a && n.width && n.height) arr.push(n);
+						if (n.a && n.child) {
+							n = n.child;
+						} else {
+							while (n) {
+								if (n.next) {
+									n = n.next;
+									break;
+								}
+								n = n.parent;
+							}
+						}
+					}
+					
+					arr = arr.reverse();
+					for (i in arr) {
+						n = arr[i];
+						var t = Tree2d.getScreenTransform(n);
+						var si = Math.sin(t.r * Math.PI / 180);
+						var co = Math.cos(t.r * Math.PI / 180);
+						var xp = [];
+						var yp = [];
+						var w = n.width / 2, h = n.height / 2;
+						xp.push(t.x + t.zx * w * co - t.zy * h * si);
+						yp.push(t.y + t.zx * w * si + t.zy * h * co);
+						w = -w;
+						xp.push(t.x + t.zx * w * co - t.zy * h * si);
+						yp.push(t.y + t.zx * w * si + t.zy * h * co);
+						h = -h;
+						xp.push(t.x + t.zx * w * co - t.zy * h * si);
+						yp.push(t.y + t.zx * w * si + t.zy * h * co);
+						w = -w;
+						xp.push(t.x + t.zx * w * co - t.zy * h * si);
+						yp.push(t.y + t.zx * w * si + t.zy * h * co);
+						
+						if (pnpoly(4, xp, yp, pos.x, pos.y)) return n;
+					}
+				},
+				
+				genHierarhy: function() {
+					var n = Tree2d.root, str = '', t = -1;
+					
+					while (n) {
+						t++;
+						
+						var s = '', i = 0;
+						for (i = 0; i < t; i++) s += '-';
+						var name = n.name;
+						if (!n.name || name == '')  name = '';
+						else name = ' ' + name;
+						if (n.class) name += ' [' + n.class + ']';
+						else name += ' [Node]';
+						str += '<option value="' + n.id + '">' + s + name + '</option>\n';
+						
+						if (n.child) {
+							n = n.child;
+						} else {
+							while (n) {
+								t--;
+								if (n.next) {
+									n = n.next;
+									break;
+								}
+								n = n.parent;
+							}
+						}
+					}
+					
+					return str;
+				}
+			}
+			
+			var lib = {
+				images:{},
+				assets:{},
+				selected:{},
+				selectedCnt: 0,
+				brush: {timeout:1000, ready:true, random:0, grid:0, drag:false},
+				pickup: false,
+				loadImage: function(name) {
+					if (lib.images[name]) return lib.images[name];
+					lib.images[name] = new Image;
+					lib.images[name].src = name;
+				},
+				alignAssetSize: function(img, size) {
+					var d = img.width / img.height;
+					if (img.width > img.height) {
+						img.width = size;
+						img.height = size / d;
+						img.vspace = size / 2 - img.height / 2;
+					} else {
+						img.height = size;
+						img.width = size * d;
+						img.hspace = size / 2 - img.width / 2;
+					}
+				},
+				select: function(name) {
+					if (!lib.selected[name]) {
+						lib.selected[name] = lib.assets[name];
+						lib.selectedCnt++;
+						document.getElementById(name).style.border = "2px solid #6468D1";
+					} else {
+						lib.selected[name] = 0;
+						delete lib.selected[name];
+						lib.selectedCnt--;
+						document.getElementById(name).style.border = "2px solid #f7f4a0";
+					}
+				},
+				loadSprite: function(name) {
+					if (lib.assets[name]) return lib.assets[name];
+					lib.loadImage(name);
+					
+					lib.assets[name] = {src: name, class: 'Sprite'};
+					
+					document.getElementById('assets').innerHTML += '<div id="'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white;" onclick="lib.select(\''+name+'\')" ><img src="'+name+'" ondblclick="placeAsset(\''+name+'\')" onload="lib.alignAssetSize(this, 60)" /></div>';
+					return lib.assets[name];
+				},
+				loadNode: function(name, file) {
+					if (lib.assets[name]) return lib.assets[name];
+					
+					var reader = new FileReader();
+					reader.onload = function(e) {
+						var node = JSON.parse(e.target.result);
+						lib.assets[name] = node;
+						
+						var withoutExt = name.substr(0, name.lastIndexOf('.'));
+						document.getElementById('assets').innerHTML += '<div id= "'+name+'" title="'+withoutExt+' template" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white; font-size: small; text-align:center;" ondblclick="placeAsset(\''+name+'\')" onclick="lib.select(\''+name+'\')" ><br />'+withoutExt+'</div>';
+					}
+					var result = reader.readAsText(file);
+					
+					return lib.assets[name];
+				},
+				load: function(evt) {
+					var files = evt.target.files;
+					for (var i = 0, f; f = files[i]; i++) {
+						var name = f.name.substr(f.name.lastIndexOf('/') + 1);
+						if (f.type == 'image/png' || f.type == 'image/jpeg') {
+							lib.loadSprite(name);
+						} else if (f.type == 'application/json') {
+							lib.loadNode(name, f);
+						}
+					}
+				},
+				mousePress: function(pos) {
+					lib.brush.drag = true;
+					if (lib.brush.ready) {
+						if (lib.selectedCnt > 0) lib.pasteAsset(pos);
+						else lib.del(pos);
+						lib.brush.ready = false;
+						setInterval(function(){lib.brush.ready = true}, lib.brush.timeout);
+					}
+				},
+				mouseMove: function(pos) {
+					if (!lib.brush.drag) return;
+					if (lib.brush.ready) {
+						if (lib.selectedCnt > 0) {
+							lib.pasteAsset(pos);
+							lib.brush.ready = false;
+							setInterval(function(){lib.brush.ready = true}, lib.brush.timeout);
+						}
+					}
+				},
+				mouseRelease: function(pos) {
+					lib.brush.drag = false;
+				},
+				pick: function(pos) {
+					var c = Tree2d.getClickedObject(pos);
+					if (c) {
+						lib.pickup = true;
+						select(c.id);
+						lib.tmpMousePos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
+						lib.tmpSelectedTrans = {x: selected.x, y: selected.y, r: selected.r, zx: selected.zx, zy:selected.zy};
+					}
+				},
+				drag: function(pos) {
+					if (lib.pickup && selected.parent) {
+						if (event.shiftKey) {
+							pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
+							var dx1 = lib.tmpMousePos.x - lib.tmpSelectedTrans.x;
+							var dy1 = lib.tmpMousePos.y - lib.tmpSelectedTrans.y;
+							var d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+							var dx2 = pos.x - lib.tmpSelectedTrans.x;
+							var dy2 = pos.y - lib.tmpSelectedTrans.y;
+							var d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+							var d = d2 / d1;
+							set(selected, 'zx', lib.tmpSelectedTrans.zx * d);
+							set(selected, 'zy', lib.tmpSelectedTrans.zy * d);
+						} else if (event.ctrlKey) {
+							pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
+							var r = Math.atan2(pos.y - lib.tmpSelectedTrans.y, pos.x - lib.tmpSelectedTrans.x) / Math.PI * 180;
+							set(selected, 'r', lib.tmpSelectedTrans.r + r);
+						} else {
+							pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
+							var x = lib.tmpSelectedTrans.x + (pos.x - lib.tmpMousePos.x);
+							var y = lib.tmpSelectedTrans.y + (pos.y - lib.tmpMousePos.y);
+							set(selected, 'x', x);
+							set(selected, 'y', y);
+						}
+					}
+				},
+				unpick: function() {
+					lib.pickup = false;
+				},
+				pasteAsset: function(pos) {
+					var c = getRandField(lib.selected);
+					pos = Tree2d.convertPointToNodeTransform(selected, pos);
+					c.x = pos.x// - canvas.width/2;
+					c.y = pos.y// - canvas.height/2;
+					Tree2d.add(selected, c);
+					document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
+				},
+				del: function(pos) {
+					var c = Tree2d.getClickedObject(pos);
+					if (c) {
+						var s = selected;
+						if (s == c) s = c.parent;
+						Tree2d.del(c);
+						document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
+						select(s.id);
+					}
+				}
+			};
+			
+			function select(id) {
+				id = parseFloat(id);
+				selected = Tree2d.findById(id);
+				document.getElementById('info').innerHTML = genInfo(selected, ['id', 'src', 'class']);
+				document.getElementById('hierarhy').value = id;
+			}
+			
+			function set(node, param, value) {
+				if (typeof(value) === 'boolean') {
+					node[param] = (value?1:0);
+					document.getElementById('edit-'+param).value = node[param];
+					document.getElementById('edit-'+param+'-checkbox').checked = (node[param]>0?true:false);
+				} else if (typeof node[param] === 'number') {
+					if (typeof parseFloat(value) === 'number') node[param] = parseFloat(value);
+					document.getElementById('edit-'+param).value = node[param];
+					if (document.getElementById('edit-'+param+'-checkbox')) document.getElementById('edit-'+param+'-checkbox').checked = (node[param]>0?true:false);
+				} else node[param] = value;
+				if (param == 'name') {
+					document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
+					document.getElementById('hierarhy').value = node.id;
+				}
+			}
+			
+			function genInfo(node, excluded) {
+				var str = '\
+				<input type="text" onclick="this.select()" onchange="set(selected,\'name\',this.value)" id="edit-name" value="'+(node.name?node.name:'')+'" /> Name<br />\
+				<input style="width:80px" type="number" onclick="this.select()" onchange="set(selected,\'x\',this.value)" id="edit-x" value="'+node.x+'" />\
+				<input style="width:80px" type="number" onclick="this.select()" onchange="set(selected,\'y\',this.value)" id="edit-y" value="'+node.y+'" /> Position<br />\
+				<input style="width:80px" type="number" onclick="this.select()" onchange="set(selected,\'zx\',this.value)" id="edit-zx" value="'+node.zx+'" />\
+				<input style="width:80px" type="number" onclick="this.select()" onchange="set(selected,\'zy\',this.value)" id="edit-zy" value="'+node.zy+'" /> Scale<br />\
+				<input type="number" onclick="this.select()" onchange="set(selected,\'r\',this.value)" id="edit-r" value="'+node.r+'" /> Rotation<br />\
+				<input type="number" onclick="this.select()" onchange="set(selected,\'a\',this.value)" id="edit-a" value="'+node.a+'" />\
+				<input type="checkbox" onclick="this.select()" onchange="set(selected,\'a\',this.checked)" id="edit-a-checkbox" '+(node.a>0?"checked":"")+' /> Opacity<br />\
+				';
+				for (i in node) {
+					var flag = '';
+					for (j in excluded) if (i == excluded[j]) flag = 'readonly';
+					if (i == 'x' || i == 'y' || i == 'r' || i == 'zx' || i == 'zy' || i == 'a') {
+					} else if (typeof node[i] == 'number' && i != 'id') {
+						var name = i;
+						if (i.length > 1) name = i.charAt(0).toUpperCase() + i.substr(1);
+						str += '<input '+flag+' type="number" onclick="this.select()" onchange="set(selected,\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /> '+name+'<br />';
+					}
+				}
+				for (i in node) {
+					var flag = '';
+					for (j in excluded) if (i == excluded[j]) flag = 'readonly';
+					if (typeof node[i] == 'string' && i != 'name') {
+						var name = i;
+						if (i.length > 1) name = i.charAt(0).toUpperCase() + i.substr(1);
+						str += '<input '+flag+' type="text" onclick="this.select()" onchange="set(selected,\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /> '+name+'<br />';
+					}
+				}
+				return str;
+			}
+			
+			function placeAsset(name) {
+				Tree2d.add(selected, lib.assets[name]);
+				document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
+			}
+			
+			function getRandField(obj) {
+				var size = 0;
+				for (i in obj) if (typeof obj == 'object') {
+					size++;
+				}
+				var n = Math.floor(Math.random() * size), k = 0;
+				for (i in obj) {
+					if (k == n) return obj[i];
+					k++;
+				}
+			}
+			
+			function debugCycle() {
+				var n = Tree2d.root;
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+				ctx.translate(canvas.width / 2, canvas.height / 2);
+				while (n) {
+					ctx.save();
+					ctx.translate(n.x, n.y);
+					ctx.rotate(n.r / 180 * Math.PI);
+					ctx.scale(n.zx, n.zy);
+					if (n.width && n.height) {
+						ctx.strokeRect(-n.width / 2 - 1, -n.height / 2 - 1, n.width + 1, n.height + 1);
+					}
+					if (n.a) {
+						if (run && n.update) n.update(n);
+						if (n.debugDraw) n.debugDraw(n);
+						else if (n.draw) n.draw(n);
+					}
+					if (n == selected) {
+						ctx.beginPath();
+						ctx.moveTo(-n.width / 2, -n.height / 2);
+						ctx.lineTo(n.width / 2, n.height / 2);
+						ctx.moveTo(-n.width / 2, n.height / 2);
+						ctx.lineTo(n.width / 2, -n.height / 2);
+						ctx.stroke();
+					}
+					
+					if (n.a && n.child) {
+						n = n.child;
+					} else {
+						while (n) {
+							ctx.restore();
+							if (n.next) {
+								n = n.next;
+								break;
+							}
+							n = n.parent;
+						}
+					}
+				}
+				ctx.translate(-canvas.width / 2, -canvas.height / 2);
+			}
+			
+			function getMousePos(canvas, evt) {
+				var rect = canvas.getBoundingClientRect();
+				return {
+					x: evt.clientX - rect.left - canvas.width / 2,
+					y: evt.clientY - rect.top - canvas.height / 2
+				};
+			}
+			
+			function pnpoly(npol, xp, yp, x, y) {
+				var i, j, c = false;
+				for (i = 0, j = npol-1; i < npol; j = i++) {
+					if ((((yp[i] <= y) && (y < yp[j])) ||
+					     ((yp[j] <= y) && (y < yp[i]))) &&
+					    (x < (xp[j] - xp[i]) * (y - yp[i]) / (yp[j] - yp[i]) + xp[i]))
+					    c =!c;
+				}
+				return c;
+			}
+			
+			function Sprite(node) {
+				node.img = lib.loadImage(node.src);
+				node.width = node.img.width;
+				node.height = node.img.height;
+				node.draw = function(node) {
+					ctx.drawImage(node.img, -node.width / 2, -node.height / 2);
+				}
+			}
+			
+			canvas = document.getElementById("myCanvas");
+			canvas.addEventListener('mousedown', function(evt) {if (evt.button == 0) lib.mousePress(getMousePos(canvas, evt)); else lib.pick(getMousePos(canvas, evt));}, false);
+			canvas.addEventListener('mousemove', function(evt) {if (evt.button == 0) lib.mouseMove(getMousePos(canvas, evt)); else lib.drag(getMousePos(canvas, evt));}, false);
+			canvas.addEventListener('mouseup',   function(evt) {if (evt.button == 0) lib.mouseRelease(getMousePos(canvas, evt)); else lib.unpick();}, false);
+			ctx = canvas.getContext("2d");
+			document.getElementById('files').addEventListener('change', lib.load, false);
+			document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
+			select(0);
+			ctx.strokeStyle = 'white';
+			ctx.lineWidth = 2;
+			setInterval(debugCycle, 10);
+		}</script>
+	</body>
+</html>
