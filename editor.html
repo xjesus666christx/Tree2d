@@ -73,14 +73,19 @@
 				
 				clean: function(node) {
 					if (node.x == 0) delete node.x;
+					else node.x = Math.floor(node.x);
 					if (node.y == 0) delete node.y;
+					else node.y = Math.floor(node.y);
 					if (node.r == 0) delete node.r;
+					else node.r = Math.floor(node.r);
 					if (node.zx == 1) delete node.zx;
 					if (node.zy == 1) delete node.zy;
 					if (node.a == 1) delete node.a;
 					if (node.id) delete node.id;
 					for (i in node) {
-						if (i != 'c' && typeof node[i] === 'object') {
+						if (typeof node[i] === 'number') {
+							node[i] = parseFloat(node[i].toFixed(4));
+						} else if (i != 'c' && typeof node[i] === 'object') {
 							node[i] = 0;
 							delete node[i];
 						}
