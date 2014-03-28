@@ -10,14 +10,14 @@
 		<div style="min-width:260px;width:22%;height:640px;valign:top;float:left;border:1px solid black">
 			<input type="button" value="Save"  onclick="console.log(JSON.stringify(Tree2d.clean(Tree2d.copy(Tree2d.root))))" style="width:33%" />
 			<input type="button" value="Load" style="width:33%" />
-			<input type="button" id="runBtn" value="Run" style="width:32%" />
+			<input type="button" value="Run" onclick="runGame(this)" style="width:32%" />
 			<select id="hierarhy" style="width:100%" onchange="select(this.value)"></select>
 			<div id="info" style="width:100%;height:30%;overflow:scroll;border:1px solid red"></div>
 			<div id="assets" style="width:100%;height:45%;overflow-y:scroll;border:1px solid black"></div>
 			<input type="file" id="files" name="files[]" multiple />
 		</div>
 		<script>{
-			var canvas, ctx, selected, run = false;
+			var canvas, ctx, selected, run = false, root;
 			
 			var Tree2d = {
 				root: {x:0, y:0, r:0, zx:1, zy:1, a:1, id:0, name:'root'},
@@ -53,13 +53,16 @@
 					if (!node.a) node.a = 1;
 					if (!node.id) node.id = Tree2d.genId();
 					if (node.class) {
-						var f = eval(node.class);
-						f(node);
-					}
+						try {
+							var f = eval(node.class);
+							f(node);
+						} catch (e) {}
+					} else node.class = "Node";
 					if (node.c) {
 						var prev;
 						for (i in node.c) {
 							var val = node.c[i];
+							if (!val.parent) val.parent = node;
 							if (!prev) node.child = val;
 							else prev.next = val;
 							prev = val;
@@ -122,6 +125,15 @@
 							while (c.next && c.next != node) c = c.next;
 							c.next = node.next;
 						}
+					}
+				},
+				
+				select: function(node) {
+					var c = node.parent.child;
+					while (c) {
+						if (c != node) c.a = 0;
+						else if (c.a == 0) c.a = 1;
+						c = c.next;
 					}
 				},
 				
@@ -241,7 +253,7 @@
 					var arr = [];
 					
 					while (n) {
-						if (n.a && n.width && n.height) arr.push(n);
+						if (n.width && n.height) arr.push(n);
 						if (n.a && n.child) {
 							n = n.child;
 						} else {
@@ -337,7 +349,7 @@
 						img.hspace = size / 2 - img.width / 2;
 					}
 				},
-				select: function(name) {
+				selectAsset: function(name) {
 					if (!lib.selected[name]) {
 						lib.selected[name] = lib.assets[name];
 						lib.selectedCnt++;
@@ -355,7 +367,7 @@
 					
 					lib.assets[name] = {src: name, class: 'Sprite'};
 					
-					document.getElementById('assets').innerHTML += '<div id="'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white;" onclick="lib.select(\''+name+'\')" ><img src="'+name+'" ondblclick="placeAsset(\''+name+'\')" onload="lib.alignAssetSize(this, 60)" /></div>';
+					document.getElementById('assets').innerHTML += '<div id="'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white;" onclick="lib.selectAsset(\''+name+'\')" ><img src="'+name+'" ondblclick="placeAsset(\''+name+'\')" onload="lib.alignAssetSize(this, 60)" /></div>';
 					return lib.assets[name];
 				},
 				loadNode: function(name, file) {
@@ -367,7 +379,7 @@
 						lib.assets[name] = node;
 						
 						var withoutExt = name.substr(0, name.lastIndexOf('.'));
-						document.getElementById('assets').innerHTML += '<div id= "'+name+'" title="'+withoutExt+' template" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white; font-size: small; text-align:center;" ondblclick="placeAsset(\''+name+'\')" onclick="lib.select(\''+name+'\')" ><br />'+withoutExt+'</div>';
+						document.getElementById('assets').innerHTML += '<div id= "'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white; font-size: small; text-align:center;" ondblclick="placeAsset(\''+name+'\')" onclick="lib.selectAsset(\''+name+'\')" ><br />'+withoutExt+'</div>';
 					}
 					var result = reader.readAsText(file);
 					
@@ -521,8 +533,9 @@
 			}
 			
 			function placeAsset(name) {
-				Tree2d.add(selected, lib.assets[name]);
+				var c = Tree2d.add(selected, lib.assets[name]);
 				document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
+				select(c.id);
 			}
 			
 			function getRandField(obj) {
@@ -538,7 +551,7 @@
 			}
 			
 			function debugCycle() {
-				var n = Tree2d.root;
+				var n = root;
 				ctx.fillRect(0, 0, canvas.width, canvas.height);
 				ctx.translate(canvas.width / 2, canvas.height / 2);
 				while (n) {
@@ -546,7 +559,7 @@
 					ctx.translate(n.x, n.y);
 					ctx.rotate(n.r / 180 * Math.PI);
 					ctx.scale(n.zx, n.zy);
-					if (n.width && n.height) {
+					if (!run && n.width && n.height) {
 						ctx.strokeRect(-n.width / 2 - 1, -n.height / 2 - 1, n.width + 1, n.height + 1);
 					}
 					if (n.a) {
@@ -554,7 +567,7 @@
 						if (n.debugDraw) n.debugDraw(n);
 						else if (n.draw) n.draw(n);
 					}
-					if (n == selected) {
+					if (!run && n == selected) {
 						ctx.beginPath();
 						ctx.moveTo(-n.width / 2, -n.height / 2);
 						ctx.lineTo(n.width / 2, n.height / 2);
@@ -587,6 +600,19 @@
 				};
 			}
 			
+			function runGame(btn) {
+				if (!run) {
+					root = Tree2d.copy(Tree2d.root);
+					Tree2d.init(root);
+					btn.value = 'Stop';
+				} else {
+					delete root;
+					root = Tree2d.root;
+					btn.value = 'Run';
+				}
+				run = !run;
+			}
+			
 			function pnpoly(npol, xp, yp, x, y) {
 				var i, j, c = false;
 				for (i = 0, j = npol-1; i < npol; j = i++) {
@@ -617,6 +643,7 @@
 			select(0);
 			ctx.strokeStyle = 'white';
 			ctx.lineWidth = 2;
+			root = Tree2d.root;
 			setInterval(debugCycle, 10);
 		}</script>
 	</body>
