@@ -335,7 +335,7 @@
 				assets:{},
 				selected:{},
 				selectedCnt: 0,
-				brush: {timeout:1000, ready:true, random:0, grid:0, drag:false},
+				brush: {timeout:1000, ready:true, random:0, grid:70, drag:false},
 				pickup: false,
 				loadImage: function(name) {
 					if (lib.images[name]) return lib.images[name];
@@ -384,6 +384,7 @@
 						lib.assets[name] = node;
 						
 						var withoutExt = name.substr(0, name.lastIndexOf('.'));
+						withoutExt = withoutExt.charAt(0).toUpperCase() + withoutExt.substr(1);
 						document.getElementById('assets').innerHTML += '<div id= "'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white; font-size: small; text-align:center;" ondblclick="placeAsset(\''+name+'\')" onclick="lib.selectAsset(\''+name+'\')" ><br />'+withoutExt+'</div>';
 					}
 					var result = reader.readAsText(file);
@@ -402,43 +403,23 @@
 					}
 				},
 				mousePress: function(pos) {
-					lib.brush.drag = true;
-					if (lib.brush.ready) {
-						if (lib.selectedCnt > 0) {
-							lib.pasteAsset(pos);
-						} else {
-							var c = Tree2d.getClickedObject(pos);
-							if (c) select(c.id);
-							else select(0);
+					if (lib.selectedCnt == 0) {
+						lib.pickup = true;
+						if (selected.parent) {
+							lib.tmpMousePos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
+							lib.tmpSelectedTrans = {x: selected.x, y: selected.y, r: selected.r, zx: selected.zx, zy:selected.zy};
 						}
-						lib.brush.ready = false;
-						setInterval(function(){lib.brush.ready = true}, lib.brush.timeout);
+					} else {
+						lib.brush.drag = true;
+						if (!lib.grid) lib.grid = 1;
+						if (selected != root) pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
+						pos.x = Math.floor((pos.x + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
+						pos.y = Math.floor((pos.y + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
+						lib.brush.dragPos = pos;
+						lib.pasteAsset(pos);
 					}
 				},
 				mouseMove: function(pos) {
-					if (!lib.brush.drag) return;
-					if (lib.brush.ready) {
-						if (lib.selectedCnt > 0) {
-							lib.pasteAsset(pos);
-							lib.brush.ready = false;
-							setInterval(function(){lib.brush.ready = true}, lib.brush.timeout);
-						}
-					}
-				},
-				mouseRelease: function(pos) {
-					lib.brush.drag = false;
-				},
-				pick: function(pos) {
-					lib.pickup = true;
-					if (selected == root) {
-						lib.tmpMousePos = pos;
-						lib.tmpSelectedTrans = {x: selected.x, y: selected.y, r: selected.r, zx: selected.zx, zy:selected.zy};
-					} else {
-						lib.tmpMousePos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
-						lib.tmpSelectedTrans = {x: selected.x, y: selected.y, r: selected.r, zx: selected.zx, zy:selected.zy};
-					}
-				},
-				drag: function(pos) {
 					if (lib.pickup && selected.parent) {
 						if (event.shiftKey) {
 							pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
@@ -462,30 +443,35 @@
 							set(selected, 'x', x);
 							set(selected, 'y', y);
 						}
-					} else if (lib.pickup && selected == root) {
-						if (event.shiftKey) {
-							var dx1 = lib.tmpMousePos.x - lib.tmpSelectedTrans.x;
-							var dy1 = lib.tmpMousePos.y - lib.tmpSelectedTrans.y;
-							var d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
-							var dx2 = pos.x - lib.tmpSelectedTrans.x;
-							var dy2 = pos.y - lib.tmpSelectedTrans.y;
-							var d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-							var d = d2 / d1;
-							set(selected, 'zx', lib.tmpSelectedTrans.zx * d);
-							set(selected, 'zy', lib.tmpSelectedTrans.zy * d);
-						} else if (event.ctrlKey) {
-							var r = Math.atan2(pos.y - lib.tmpSelectedTrans.y, pos.x - lib.tmpSelectedTrans.x) / Math.PI * 180;
-							set(selected, 'r', lib.tmpSelectedTrans.r + r);
-						} else {
-							var x = lib.tmpSelectedTrans.x + (pos.x - lib.tmpMousePos.x);
-							var y = lib.tmpSelectedTrans.y + (pos.y - lib.tmpMousePos.y);
-							set(selected, 'x', x);
-							set(selected, 'y', y);
+					} else if (lib.brush.drag && lib.brush.ready) {
+						if (selected != root) pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
+						if (Math.abs(pos.x - lib.brush.dragPos.x) > lib.brush.grid * 0.75 || Math.abs(pos.y - lib.brush.dragPos.y) > lib.brush.grid * 0.75) {
+							if (!lib.grid) lib.grid = 1;
+							pos.x = Math.floor((pos.x + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
+							pos.y = Math.floor((pos.y + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
+							lib.brush.dragPos = pos;
+							lib.pasteAsset(pos);
 						}
 					}
 				},
-				unpick: function() {
+				mouseRelease: function(pos) {
+					lib.brush.drag = false;
 					lib.pickup = false;
+				},
+				pick: function(pos) {
+					if (lib.selectedCnt == 0) {
+						var c = Tree2d.getClickedObject(pos);
+						if (c) select(c.id);
+						else select(0);
+					} else {
+						lib.del(pos);
+					}
+				},
+				drag: function(pos) {
+					
+				},
+				unpick: function() {
+					
 				},
 				pasteAsset: function(pos) {
 					var c = getRandField(lib.selected);
@@ -494,6 +480,7 @@
 					c.y = pos.y// - canvas.height/2;
 					Tree2d.add(selected, c);
 					document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
+					document.getElementById('hierarhy').value = selected.id;
 				},
 				del: function(pos) {
 					var c = Tree2d.getClickedObject(pos);
