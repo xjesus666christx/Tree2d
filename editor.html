@@ -404,8 +404,13 @@
 				mousePress: function(pos) {
 					lib.brush.drag = true;
 					if (lib.brush.ready) {
-						if (lib.selectedCnt > 0) lib.pasteAsset(pos);
-						else lib.del(pos);
+						if (lib.selectedCnt > 0) {
+							lib.pasteAsset(pos);
+						} else {
+							var c = Tree2d.getClickedObject(pos);
+							if (c) select(c.id);
+							else select(0);
+						}
 						lib.brush.ready = false;
 						setInterval(function(){lib.brush.ready = true}, lib.brush.timeout);
 					}
@@ -424,10 +429,11 @@
 					lib.brush.drag = false;
 				},
 				pick: function(pos) {
-					var c = Tree2d.getClickedObject(pos);
-					if (c) {
-						lib.pickup = true;
-						select(c.id);
+					lib.pickup = true;
+					if (selected == root) {
+						lib.tmpMousePos = pos;
+						lib.tmpSelectedTrans = {x: selected.x, y: selected.y, r: selected.r, zx: selected.zx, zy:selected.zy};
+					} else {
 						lib.tmpMousePos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
 						lib.tmpSelectedTrans = {x: selected.x, y: selected.y, r: selected.r, zx: selected.zx, zy:selected.zy};
 					}
@@ -451,6 +457,26 @@
 							set(selected, 'r', lib.tmpSelectedTrans.r + r);
 						} else {
 							pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
+							var x = lib.tmpSelectedTrans.x + (pos.x - lib.tmpMousePos.x);
+							var y = lib.tmpSelectedTrans.y + (pos.y - lib.tmpMousePos.y);
+							set(selected, 'x', x);
+							set(selected, 'y', y);
+						}
+					} else if (lib.pickup && selected == root) {
+						if (event.shiftKey) {
+							var dx1 = lib.tmpMousePos.x - lib.tmpSelectedTrans.x;
+							var dy1 = lib.tmpMousePos.y - lib.tmpSelectedTrans.y;
+							var d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+							var dx2 = pos.x - lib.tmpSelectedTrans.x;
+							var dy2 = pos.y - lib.tmpSelectedTrans.y;
+							var d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+							var d = d2 / d1;
+							set(selected, 'zx', lib.tmpSelectedTrans.zx * d);
+							set(selected, 'zy', lib.tmpSelectedTrans.zy * d);
+						} else if (event.ctrlKey) {
+							var r = Math.atan2(pos.y - lib.tmpSelectedTrans.y, pos.x - lib.tmpSelectedTrans.x) / Math.PI * 180;
+							set(selected, 'r', lib.tmpSelectedTrans.r + r);
+						} else {
 							var x = lib.tmpSelectedTrans.x + (pos.x - lib.tmpMousePos.x);
 							var y = lib.tmpSelectedTrans.y + (pos.y - lib.tmpMousePos.y);
 							set(selected, 'x', x);
