@@ -9,12 +9,13 @@
 		</div>
 		<div style="min-width:260px;width:22%;height:640px;valign:top;float:left;border:1px solid black">
 			<input type="button" value="Save"  onclick="console.log(JSON.stringify(Tree2d.clean(Tree2d.copy(Tree2d.root))))" style="width:33%" />
-			<input type="button" value="Load" style="width:33%" />
+			<input type="button" value="Load" onclick="document.getElementById('projectLoader').click()" style="width:33%" />
 			<input type="button" value="Run" onclick="runGame(this)" style="width:32%" />
 			<select id="hierarhy" style="width:100%" onchange="select(this.value)"></select>
 			<div id="info" style="width:100%;height:30%;overflow:scroll;border:1px solid red"></div>
 			<div id="assets" style="width:100%;height:45%;overflow-y:scroll;border:1px solid black"></div>
 			<input type="file" id="files" name="files[]" multiple />
+			<input type="file" id="projectLoader" style="visibility:hidden;position:absolute;top:0;left:0" />
 		</div>
 		<script>{
 			var canvas, ctx, selected, run = false, root;
@@ -145,6 +146,7 @@
 				cycle: function() {
 					var n = Tree2d.root;
 					ctx.fillRect(0, 0, canvas.width, canvas.height);
+					ctx.save();
 					ctx.translate(canvas.width / 2, canvas.height / 2);
 					while (n) {
 						ctx.save();
@@ -169,7 +171,7 @@
 							}
 						}
 					}
-					ctx.translate(-canvas.width / 2, -canvas.height / 2);
+					ctx.restore();
 				},
 				
 				findById: function(id) {
@@ -341,6 +343,8 @@
 					if (lib.images[name]) return lib.images[name];
 					lib.images[name] = new Image;
 					lib.images[name].src = name;
+					if (!lib.assets[name]) lib.loadSprite(name);
+					return lib.images[name];
 				},
 				alignAssetSize: function(img, size) {
 					var d = img.width / img.height;
@@ -368,24 +372,27 @@
 				},
 				loadSprite: function(name) {
 					if (lib.assets[name]) return lib.assets[name];
-					lib.loadImage(name);
 					
 					lib.assets[name] = {src: name, class: 'Sprite'};
+					lib.loadImage(name);
 					
 					document.getElementById('assets').innerHTML += '<div id="'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white;" onclick="lib.selectAsset(\''+name+'\')" ><img src="'+name+'" ondblclick="placeAsset(\''+name+'\')" onload="lib.alignAssetSize(this, 60)" /></div>';
 					return lib.assets[name];
+				},
+				addAssetFromString: function(name, str) {
+					var node = JSON.parse(str);
+					lib.assets[name] = node;
+					
+					var withoutExt = name.substr(0, name.lastIndexOf('.'));
+					withoutExt = withoutExt.charAt(0).toUpperCase() + withoutExt.substr(1);
+					document.getElementById('assets').innerHTML += '<div id= "'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white; font-size: small; text-align:center;" ondblclick="placeAsset(\''+name+'\')" onclick="lib.selectAsset(\''+name+'\')" ><br />'+withoutExt+'</div>';
 				},
 				loadNode: function(name, file) {
 					if (lib.assets[name]) return lib.assets[name];
 					
 					var reader = new FileReader();
 					reader.onload = function(e) {
-						var node = JSON.parse(e.target.result);
-						lib.assets[name] = node;
-						
-						var withoutExt = name.substr(0, name.lastIndexOf('.'));
-						withoutExt = withoutExt.charAt(0).toUpperCase() + withoutExt.substr(1);
-						document.getElementById('assets').innerHTML += '<div id= "'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white; font-size: small; text-align:center;" ondblclick="placeAsset(\''+name+'\')" onclick="lib.selectAsset(\''+name+'\')" ><br />'+withoutExt+'</div>';
+						lib.addAssetFromString(name, e.target.result);
 					}
 					var result = reader.readAsText(file);
 					
@@ -401,6 +408,22 @@
 							lib.loadNode(name, f);
 						}
 					}
+				},
+				loadProject: function(evt) {
+					var file = evt.target.files[0];
+					var withoutExt = file.name.substr(0, file.name.lastIndexOf('.'));
+					
+					var reader = new FileReader();
+					reader.onload = function(e) {
+						var node = JSON.parse(e.target.result);
+						Tree2d.init(node);
+						root = Tree2d.root = node;
+						
+						document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
+						document.getElementById('hierarhy').value = 0;
+						select(node.id);
+					}
+					var result = reader.readAsText(file);
 				},
 				mousePress: function(pos) {
 					if (lib.selectedCnt == 0) {
@@ -570,6 +593,7 @@
 			
 			function debugCycle() {
 				var n = root;
+				ctx.save();
 				ctx.fillRect(0, 0, canvas.width, canvas.height);
 				ctx.translate(canvas.width / 2, canvas.height / 2);
 				while (n) {
@@ -577,8 +601,10 @@
 					ctx.translate(n.x, n.y);
 					ctx.rotate(n.r / 180 * Math.PI);
 					ctx.scale(n.zx, n.zy);
-					if (!run && n.width && n.height) {
-						ctx.strokeRect(-n.width / 2 - 1, -n.height / 2 - 1, n.width + 1, n.height + 1);
+					if (!run) {
+						if (n.width && n.height) {
+							ctx.strokeRect(-n.width / 2 - 1, -n.height / 2 - 1, n.width + 1, n.height + 1);
+						}
 					}
 					if (n.a) {
 						if (run && n.update) n.update(n);
@@ -607,7 +633,7 @@
 						}
 					}
 				}
-				ctx.translate(-canvas.width / 2, -canvas.height / 2);
+				ctx.restore();
 			}
 			
 			function getMousePos(canvas, evt) {
@@ -644,8 +670,8 @@
 			
 			function Sprite(node) {
 				node.img = lib.loadImage(node.src);
-				node.width = node.img.width;
-				node.height = node.img.height;
+				if (!node.width) node.width = node.img.width;
+				if (!node.height) node.height = node.img.height;
 				node.draw = function(node) {
 					ctx.drawImage(node.img, -node.width / 2, -node.height / 2);
 				}
@@ -657,10 +683,12 @@
 			canvas.addEventListener('mouseup',   function(evt) {if (evt.button == 0) lib.mouseRelease(getMousePos(canvas, evt)); else lib.unpick();}, false);
 			ctx = canvas.getContext("2d");
 			document.getElementById('files').addEventListener('change', lib.load, false);
+			document.getElementById('projectLoader').addEventListener('change', lib.loadProject, false);
 			document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
 			select(0);
 			ctx.strokeStyle = 'white';
 			ctx.lineWidth = 2;
+			lib.addAssetFromString('node.json', '{"class":"Node"}');
 			root = Tree2d.root;
 			setInterval(debugCycle, 10);
 		}</script>
