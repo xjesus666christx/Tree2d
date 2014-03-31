@@ -8,7 +8,7 @@
 			</canvas>
 		</div>
 		<div style="min-width:260px;width:22%;height:640px;valign:top;float:left;border:1px solid black">
-			<input type="button" value="Save"  onclick="console.log(JSON.stringify(Tree2d.clean(Tree2d.copy(Tree2d.root))))" style="width:33%" />
+			<input type="button" value="Save"  onclick="lib.saveProject()" style="width:33%" />
 			<input type="button" value="Load" onclick="document.getElementById('projectLoader').click()" style="width:33%" />
 			<input type="button" value="Run" onclick="runGame(this)" style="width:32%" />
 			<select id="hierarhy" style="width:100%" onchange="select(this.value)"></select>
@@ -16,6 +16,7 @@
 			<div id="assets" style="width:100%;height:45%;overflow-y:scroll;border:1px solid black"></div>
 			<input type="file" id="files" name="files[]" multiple />
 			<input type="file" id="projectLoader" style="visibility:hidden;position:absolute;top:0;left:0" />
+			<div id="saveAsDiv" style="display:none"></div>
 		</div>
 		<script>{
 			var canvas, ctx, selected, run = false, root;
@@ -91,7 +92,10 @@
 							delete node[i];
 						}
 					}
-					for (i in node.c) Tree2d.clean(node.c[i]);
+					for (i in node.c) {
+						if (node.c[i]) Tree2d.clean(node.c[i]);
+						else delete node.c[i];
+					}
 					return node;
 				},
 				
@@ -425,6 +429,14 @@
 					}
 					var result = reader.readAsText(file);
 				},
+				saveProject: function() {
+					var text = JSON.stringify(Tree2d.clean(Tree2d.copy(Tree2d.root)));
+					var pom = document.createElement('a');
+					pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+					pom.setAttribute('download', root.name + '.json');
+					pom.setAttribute('type', 'application/json');
+					pom.click();
+				},
 				mousePress: function(pos) {
 					if (lib.selectedCnt == 0) {
 						lib.pickup = true;
@@ -491,10 +503,8 @@
 					}
 				},
 				drag: function(pos) {
-					
 				},
 				unpick: function() {
-					
 				},
 				pasteAsset: function(pos) {
 					var c = getRandField(lib.selected);
@@ -507,12 +517,9 @@
 				},
 				del: function(pos) {
 					var c = Tree2d.getClickedObject(pos);
-					if (c) {
-						var s = selected;
-						if (s == c) s = c.parent;
+					if (c.parent == selected) {
 						Tree2d.del(c);
 						document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
-						select(s.id);
 					}
 				}
 			};
