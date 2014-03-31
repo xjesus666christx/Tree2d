@@ -2,21 +2,25 @@
 <html>
 	<head><script src="classes.js"></script></head>
 	<body onselectstart="return false"  oncontextmenu="return false">
-		<div style="min-width:960px;width:77%;height:640px;overflow:scroll;float:left;border:1px solid black">
+		<div style="min-width:960px;width:77%;height:640px;overflow:scroll;float:left">
 			<canvas id="myCanvas" width="512" height="512" style="border:1px solid #999999;">
 				Your browser does not support the HTML5 canvas tag.
 			</canvas>
 		</div>
-		<div style="min-width:260px;width:22%;height:640px;valign:top;float:left;border:1px solid black">
-			<input type="button" value="Save"  onclick="lib.saveProject()" style="width:33%" />
-			<input type="button" value="Load" onclick="document.getElementById('projectLoader').click()" style="width:33%" />
+		<div style="min-width:260px;width:22%;height:640px;valign:top;float:left">
+			<input type="button" value="Save"  onclick="lib.saveProject()" style="width:32%" />
+			<input type="button" value="Load" onclick="document.getElementById('projectLoader').click()" style="width:32%" />
 			<input type="button" value="Run" onclick="runGame(this)" style="width:32%" />
 			<select id="hierarhy" style="width:100%" onchange="select(this.value)"></select>
-			<div id="info" style="width:100%;height:30%;overflow:scroll;border:1px solid red"></div>
-			<div id="assets" style="width:100%;height:45%;overflow-y:scroll;border:1px solid black"></div>
-			<input type="file" id="files" name="files[]" multiple />
+			<div id="info" style="width:100%;height:30%;overflow:scroll"></div>
+			<input type="range" min="0" max="100" step="5" value="0" onchange="lib.setGrid(this)" /> Grid<br />
+			<input type="range" min="0" max="20" value="0" onchange="lib.setBrushRandom(this)" /> Brush random<br />
+			<input type="range" min="0" max="30" step="2" value="10" onchange="lib.setBrushDelay(this)" /> Brush delay<br />
+			<div style="border:1px solid gray;width:100%;height:45%;">
+				Assets: <input type="file" id="files" name="files[]" multiple /><br />
+				<div id="assets" style="width:100%;height:85%;overflow-y:scroll"></div>
+			</div>
 			<input type="file" id="projectLoader" style="visibility:hidden;position:absolute;top:0;left:0" />
-			<div id="saveAsDiv" style="display:none"></div>
 		</div>
 		<script>{
 			var canvas, ctx, selected, run = false, root;
@@ -341,7 +345,7 @@
 				assets:{},
 				selected:{},
 				selectedCnt: 0,
-				brush: {timeout:1000, ready:true, random:0, grid:70, drag:false},
+				brush: {timeout:10, ready:true, random:0, grid:0, drag:false, t:0},
 				pickup: false,
 				loadImage: function(name) {
 					if (lib.images[name]) return lib.images[name];
@@ -446,18 +450,27 @@
 						}
 					} else {
 						lib.brush.drag = true;
+						if (!lib.brush.grid) lib.brush.grid = 1;
 						if (!lib.grid) lib.grid = 1;
 						if (selected != root) pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
 						pos.x = Math.floor((pos.x + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
 						pos.y = Math.floor((pos.y + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
+						pos.x += Math.random() * lib.brush.random * 2 - lib.brush.random;
+						pos.y += Math.random() * lib.brush.random * 2 - lib.brush.random;
 						lib.brush.dragPos = pos;
 						lib.pasteAsset(pos);
 					}
+					lib.brush.t = lib.brush.timeout;
 				},
 				mouseMove: function(pos) {
+					if (lib.brush.t > 0) {
+						lib.brush.t--;
+						return;
+					}
 					if (lib.pickup && selected.parent) {
+						if (!lib.brush.grid) lib.brush.grid = 1;
+						pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
 						if (event.shiftKey) {
-							pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
 							var dx1 = lib.tmpMousePos.x - lib.tmpSelectedTrans.x;
 							var dy1 = lib.tmpMousePos.y - lib.tmpSelectedTrans.y;
 							var d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
@@ -468,11 +481,9 @@
 							set(selected, 'zx', lib.tmpSelectedTrans.zx * d);
 							set(selected, 'zy', lib.tmpSelectedTrans.zy * d);
 						} else if (event.ctrlKey) {
-							pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
 							var r = Math.atan2(pos.y - lib.tmpSelectedTrans.y, pos.x - lib.tmpSelectedTrans.x) / Math.PI * 180;
 							set(selected, 'r', lib.tmpSelectedTrans.r + r);
 						} else {
-							pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
 							var x = lib.tmpSelectedTrans.x + (pos.x - lib.tmpMousePos.x);
 							var y = lib.tmpSelectedTrans.y + (pos.y - lib.tmpMousePos.y);
 							set(selected, 'x', x);
@@ -484,10 +495,13 @@
 							if (!lib.grid) lib.grid = 1;
 							pos.x = Math.floor((pos.x + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
 							pos.y = Math.floor((pos.y + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
+							pos.x += Math.random() * lib.brush.random* 2 - lib.brush.random;
+							pos.y += Math.random() * lib.brush.random * 2 - lib.brush.random;
 							lib.brush.dragPos = pos;
 							lib.pasteAsset(pos);
 						}
 					}
+					lib.brush.t = lib.brush.timeout;
 				},
 				mouseRelease: function(pos) {
 					lib.brush.drag = false;
@@ -517,10 +531,23 @@
 				},
 				del: function(pos) {
 					var c = Tree2d.getClickedObject(pos);
-					if (c.parent == selected) {
+					if (c && c.parent == selected) {
 						Tree2d.del(c);
 						document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
+						select(selected.id);
 					}
+				},
+				setGrid: function(input) {
+					lib.brush.grid = parseFloat(input.value);
+					input.title = lib.brush.grid;
+				},
+				setBrushRandom: function(input) {
+					lib.brush.random = parseFloat(input.value);
+					input.title = lib.brush.random;
+				},
+				setBrushDelay: function(input) {
+					lib.brush.timeout = parseFloat(input.value);
+					input.title = lib.brush.timeout;
 				}
 			};
 			
@@ -699,6 +726,7 @@
 			canvas.addEventListener('mousedown', function(evt) {if (evt.button == 0) lib.mousePress(getMousePos(canvas, evt)); else lib.pick(getMousePos(canvas, evt));}, false);
 			canvas.addEventListener('mousemove', function(evt) {if (evt.button == 0) lib.mouseMove(getMousePos(canvas, evt)); else lib.drag(getMousePos(canvas, evt));}, false);
 			canvas.addEventListener('mouseup',   function(evt) {if (evt.button == 0) lib.mouseRelease(getMousePos(canvas, evt)); else lib.unpick();}, false);
+			canvas.addEventListener('mouseout',   function(evt) {if (evt.button == 0) lib.mouseRelease(0); else lib.unpick();}, false);
 			ctx = canvas.getContext("2d");
 			document.getElementById('files').addEventListener('change', lib.load, false);
 			document.getElementById('projectLoader').addEventListener('change', lib.loadProject, false);
