@@ -555,7 +555,7 @@
 				<input style="width:80px" type="number" onclick="this.select()" onchange="set(selected,\'zx\',this.value)" id="edit-zx" value="'+node.zx+'" />\
 				<input style="width:80px" type="number" onclick="this.select()" onchange="set(selected,\'zy\',this.value)" id="edit-zy" value="'+node.zy+'" /> Scale<br />\
 				<input type="number" onclick="this.select()" onchange="set(selected,\'r\',this.value)" id="edit-r" value="'+node.r+'" /> Rotation<br />\
-				<input type="number" onclick="this.select()" onchange="set(selected,\'a\',this.value)" id="edit-a" value="'+node.a+'" />\
+				<input type="range" onchange="set(selected,\'a\',this.value)" id="edit-a" min="0" max="1" step="0.05" value="'+node.a+'" />\
 				<input type="checkbox" onclick="this.select()" onchange="set(selected,\'a\',this.checked)" id="edit-a-checkbox" '+(node.a>0?"checked":"")+' /> Opacity<br />\
 				';
 				for (i in node) {
