@@ -12,6 +12,9 @@
 			<input type="button" value="Load" onclick="document.getElementById('projectLoader').click()" style="width:32%" />
 			<input type="button" value="Run" onclick="runGame(this)" style="width:32%" />
 			<select id="hierarhy" style="width:100%" onchange="select(this.value)"></select>
+			<input type="button" value="Raise"  onclick="lib.raise(selected)" style="width:32%" />
+			<input type="button" value="Fall" onclick="lib.fall(selected)" style="width:32%" />
+			<input type="button" value="Delete" onclick="lib.del(selected)" style="width:32%" />
 			<div id="info" style="width:100%;height:30%;overflow:scroll"></div>
 			<input type="range" min="0" max="100" step="5" value="0" onchange="lib.setGrid(this)" /> Grid<br />
 			<input type="range" min="0" max="20" value="0" onchange="lib.setBrushRandom(this)" /> Brush random<br />
@@ -459,14 +462,10 @@
 						pos.y += Math.random() * lib.brush.random * 2 - lib.brush.random;
 						lib.brush.dragPos = pos;
 						lib.pasteAsset(pos);
+						lib.brush.t = lib.brush.timeout;
 					}
-					lib.brush.t = lib.brush.timeout;
 				},
 				mouseMove: function(pos) {
-					if (lib.brush.t > 0) {
-						lib.brush.t--;
-						return;
-					}
 					if (lib.pickup && selected.parent) {
 						if (!lib.brush.grid) lib.brush.grid = 1;
 						pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
@@ -490,6 +489,10 @@
 							set(selected, 'y', y);
 						}
 					} else if (lib.brush.drag && lib.brush.ready) {
+						if (lib.brush.t > 0) {
+							lib.brush.t--;
+							return;
+						}
 						if (selected != root) pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
 						if (Math.abs(pos.x - lib.brush.dragPos.x) > lib.brush.grid * 0.75 || Math.abs(pos.y - lib.brush.dragPos.y) > lib.brush.grid * 0.75) {
 							if (!lib.grid) lib.grid = 1;
@@ -500,23 +503,27 @@
 							lib.brush.dragPos = pos;
 							lib.pasteAsset(pos);
 						}
+						lib.brush.t = lib.brush.timeout;
 					}
-					lib.brush.t = lib.brush.timeout;
 				},
 				mouseRelease: function(pos) {
 					lib.brush.drag = false;
 					lib.pickup = false;
 				},
 				pick: function(pos) {
+					var c = Tree2d.getClickedObject(pos);
 					if (lib.selectedCnt == 0) {
-						var c = Tree2d.getClickedObject(pos);
 						if (c) select(c.id);
-						else select(0);
+						else select(Tree2d.root.id);
 					} else {
-						lib.del(pos);
+						if (c && c.parent == selected) lib.del(c);
 					}
 				},
 				drag: function(pos) {
+					if (lib.selectedCnt != 0) {
+						var c = Tree2d.getClickedObject(pos);
+						if (c && c.parent == selected) lib.del(c);
+					}
 				},
 				unpick: function() {
 				},
@@ -529,13 +536,12 @@
 					document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
 					document.getElementById('hierarhy').value = selected.id;
 				},
-				del: function(pos) {
-					var c = Tree2d.getClickedObject(pos);
-					if (c && c.parent == selected) {
-						Tree2d.del(c);
-						document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
-						select(selected.id);
-					}
+				del: function(c) {
+					if (!c.parent) return;
+					if (c == selected) select(selected.parent.id);
+					Tree2d.del(c);
+					document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
+					select(selected.id);
 				},
 				setGrid: function(input) {
 					lib.brush.grid = parseFloat(input.value);
