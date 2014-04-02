@@ -2,12 +2,12 @@
 <html>
 	<head><script src="classes.js"></script></head>
 	<body onselectstart="return false"  oncontextmenu="return false">
-		<div style="min-width:960px;width:77%;height:640px;overflow:scroll;float:left">
+		<div style="min-width:960px;width:77%;height:650px;overflow:scroll;float:left">
 			<canvas id="myCanvas" width="512" height="512" style="border:1px solid #999999;">
 				Your browser does not support the HTML5 canvas tag.
 			</canvas>
 		</div>
-		<div style="min-width:260px;width:22%;height:640px;valign:top;float:left">
+		<div style="min-width:260px;width:22%;height:650px;valign:top;float:left">
 			<input type="button" value="Save"  onclick="lib.saveProject()" style="width:32%" />
 			<input type="button" value="Load" onclick="document.getElementById('projectLoader').click()" style="width:32%" />
 			<input type="button" value="Run" onclick="runGame(this)" style="width:32%" />
@@ -19,7 +19,7 @@
 			<input type="range" min="0" max="100" step="5" value="0" onchange="lib.setGrid(this)" /> Grid<br />
 			<input type="range" min="0" max="20" value="0" onchange="lib.setBrushRandom(this)" /> Brush random<br />
 			<input type="range" min="0" max="30" step="2" value="10" onchange="lib.setBrushDelay(this)" /> Brush delay<br />
-			<div style="border:1px solid gray;width:100%;height:45%;">
+			<div style="border:1px solid gray;width:100%;height:45%;cursor:default;">
 				Assets: <input type="file" id="files" name="files[]" multiple /><br />
 				<div id="assets" style="width:100%;height:85%;overflow-y:scroll"></div>
 			</div>
@@ -29,7 +29,7 @@
 			var canvas, ctx, selected, run = false, root;
 			
 			var Tree2d = {
-				root: {x:0, y:0, r:0, zx:1, zy:1, a:1, id:0, name:'root'},
+				root: {x:0, y:0, r:0, zx:1, zy:1, a:1, id:0, name:'root', width:512, height:512},
 				cid: 1,
 				
 				genId: function() {
@@ -433,6 +433,11 @@
 						document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
 						document.getElementById('hierarhy').value = 0;
 						select(node.id);
+						
+						if (!node.width) node.width = 512;
+						if (!node.height) node.height = 512;
+						canvas.width = node.width;
+						canvas.height = node.height;
 					}
 					var result = reader.readAsText(file);
 				},
@@ -485,6 +490,10 @@
 						} else {
 							var x = lib.tmpSelectedTrans.x + (pos.x - lib.tmpMousePos.x);
 							var y = lib.tmpSelectedTrans.y + (pos.y - lib.tmpMousePos.y);
+							var x1 = Math.floor((x + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
+							var y1 = Math.floor((y + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
+							if (Math.abs(x1 - x) < 10) x = x1;
+							if (Math.abs(y1 - y) < 10) y = y1;
 							set(selected, 'x', x);
 							set(selected, 'y', y);
 						}
@@ -599,7 +608,13 @@
 					document.getElementById('edit-'+param).value = node[param];
 					document.getElementById('edit-'+param+'-checkbox').checked = (node[param]>0?true:false);
 				} else if (typeof node[param] === 'number') {
-					if (typeof parseFloat(value) === 'number') node[param] = parseFloat(value);
+					if (typeof parseFloat(value) === 'number') {
+						node[param] = parseFloat(value);
+						if (node == selected && (param == 'width' || param == 'height')) {
+							canvas.width = node.width;
+							canvas.height = node.height;
+						}
+					}
 					document.getElementById('edit-'+param).value = node[param];
 					if (document.getElementById('edit-'+param+'-checkbox')) document.getElementById('edit-'+param+'-checkbox').checked = (node[param]>0?true:false);
 				} else node[param] = value;
