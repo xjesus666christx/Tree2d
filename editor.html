@@ -8,675 +8,155 @@
 			</canvas>
 		</div>
 		<div style="min-width:260px;width:22%;height:650px;valign:top;float:left">
-			<input type="button" value="Save"  onclick="lib.saveProject()" style="width:32%" />
+			<input type="button" value="Save"  onclick="ed.saveProject()" style="width:32%" />
 			<input type="button" value="Load" onclick="document.getElementById('projectLoader').click()" style="width:32%" />
-			<input type="button" value="Run" onclick="runGame(this)" style="width:32%" />
-			<select id="hierarhy" style="width:100%" onchange="select(this.value)"></select>
+			<input type="button" value="Run" onclick="ed.runGame(this)" style="width:32%" />
+			<select id="hierarhy" style="width:100%" onchange="ed.select(this.value)"></select>
 			<div id="info" style="width:100%;height:30%;overflow:scroll"></div>
-			<input type="button" value="Raise"  onclick="lib.raise(selected)" style="width:32%" />
-			<input type="button" value="Fall" onclick="lib.fall(selected)" style="width:32%" />
-			<input type="button" value="Delete" onclick="lib.del(selected)" style="width:32%" />
-			<input type="range" min="0" max="100" step="5" value="0" onchange="lib.setGrid(this)" /> Grid<br />
-			<input type="range" min="0" max="20" value="0" onchange="lib.setBrushRandom(this)" /> Brush random<br />
-			<input type="range" min="0" max="30" step="2" value="10" onchange="lib.setBrushDelay(this)" /> Brush delay<br />
+			<input type="button" value="Raise"  onclick="ed.raise()" style="width:32%" />
+			<input type="button" value="Fall" onclick="ed.fall()" style="width:32%" />
+			<input type="button" value="Delete" onclick="ed.del(ed.selected)" style="width:32%" />
+			<input type="range" min="0" max="100" step="5" value="0" onchange="ed.setGrid(this)" /> Grid<br />
+			<input type="range" min="0" max="20" value="0" onchange="ed.setBrushRandom(this)" /> Brush random<br />
+			<input type="range" min="0" max="30" step="2" value="10" onchange="ed.setBrushDelay(this)" /> Brush delay<br />
 			<div style="border:1px solid gray;width:100%;height:45%;cursor:default;">
 				Assets: <input type="file" id="files" name="files[]" multiple /><br />
 				<div id="assets" style="width:100%;height:85%;overflow-y:scroll"></div>
 			</div>
 			<input type="file" id="projectLoader" style="visibility:hidden;position:absolute;top:0;left:0" />
 		</div>
-		<script>{
-			var canvas, ctx, selected, run = false, root;
+	</body>
+	<script>{
+		var canvas, ctx;
+		
+		var Tree2d = {
+			root: {x:0, y:0, r:0, zx:1, zy:1, a:1, id:0, name:'root', width:512, height:512},
+			cid: 1,
 			
-			var Tree2d = {
-				root: {x:0, y:0, r:0, zx:1, zy:1, a:1, id:0, name:'root', width:512, height:512},
-				cid: 1,
-				
-				genId: function() {
-					return Tree2d.cid++;
-				},
-				
-				copy: function(node) {
-					var copy = {};
-					for (i in node) {
-						if (typeof node[i] === 'function' || typeof node[i] === 'object' || i == 'id') {
-						} else {
-							copy[i] = node[i];
-						}
+			genId: function() {
+				return Tree2d.cid++;
+			},
+			
+			copy: function(node) {
+				var copy = {};
+				for (i in node) {
+					if (typeof node[i] === 'function' || typeof node[i] === 'object' || i == 'id') {
+					} else {
+						copy[i] = node[i];
 					}
-					if (node && node.c) {
-						copy.c = [];
-						for (i in node.c) {
-							copy.c[i] = Tree2d.copy(node.c[i]);
-						}
-					}
-					return copy;
-				},
-				
-				init: function(node) {
-					if (!node.x) node.x = 0;
-					if (!node.y) node.y = 0;
-					if (!node.r) node.r = 0;
-					if (!node.zx) node.zx = 1;
-					if (!node.zy) node.zy = 1;
-					if (!node.a) node.a = 1;
-					if (!node.id) node.id = Tree2d.genId();
-					if (node.class) {
-						try {
-							var f = eval(node.class);
-							f(node);
-						} catch (e) {}
-					} else node.class = "Node";
-					if (node.c) {
-						var prev;
-						for (i in node.c) {
-							var val = node.c[i];
-							if (!val.parent) val.parent = node;
-							if (!prev) node.child = val;
-							else prev.next = val;
-							prev = val;
-							Tree2d.init(val);
-						}
-					}
-				},
-				
-				clean: function(node) {
-					if (node.x == 0) delete node.x;
-					else node.x = Math.floor(node.x);
-					if (node.y == 0) delete node.y;
-					else node.y = Math.floor(node.y);
-					if (node.r == 0) delete node.r;
-					else node.r = Math.floor(node.r);
-					if (node.zx == 1) delete node.zx;
-					if (node.zy == 1) delete node.zy;
-					if (node.a == 1) delete node.a;
-					if (node.id) delete node.id;
-					for (i in node) {
-						if (typeof node[i] === 'number') {
-							node[i] = parseFloat(node[i].toFixed(4));
-						} else if (i != 'c' && typeof node[i] === 'object') {
-							node[i] = 0;
-							delete node[i];
-						}
-					}
+				}
+				if (node && node.c) {
+					copy.c = [];
 					for (i in node.c) {
-						if (node.c[i]) Tree2d.clean(node.c[i]);
-						else delete node.c[i];
+						copy.c[i] = Tree2d.copy(node.c[i]);
 					}
-					return node;
-				},
+				}
+				return copy;
+			},
+			
+			init: function(node) {
+				if (!node.x) node.x = 0;
+				if (!node.y) node.y = 0;
+				if (!node.r) node.r = 0;
+				if (!node.zx) node.zx = 1;
+				if (!node.zy) node.zy = 1;
+				if (!node.a) node.a = 1;
+				if (!node.id) node.id = Tree2d.genId();
+				if (node.class) {
+					try {
+						var f = eval(node.class);
+						f(node);
+					} catch (e) {}
+				} else node.class = "Node";
+				if (node.c) {
+					var prev;
+					for (i in node.c) {
+						var val = node.c[i];
+						if (!val.parent) val.parent = node;
+						if (!prev) node.child = val;
+						else prev.next = val;
+						prev = val;
+						Tree2d.init(val);
+					}
+				}
+			},
+			
+			clean: function(node) {
+				if (node.x == 0) delete node.x;
+				else node.x = Math.floor(node.x);
+				if (node.y == 0) delete node.y;
+				else node.y = Math.floor(node.y);
+				if (node.r == 0) delete node.r;
+				else node.r = Math.floor(node.r);
+				if (node.zx == 1) delete node.zx;
+				if (node.zy == 1) delete node.zy;
+				if (node.a == 1) delete node.a;
+				if (node.id) delete node.id;
+				for (i in node) {
+					if (typeof node[i] === 'number') {
+						node[i] = parseFloat(node[i].toFixed(4));
+					} else if (i != 'c' && typeof node[i] === 'object') {
+						node[i] = 0;
+						delete node[i];
+					}
+				}
+				for (i in node.c) {
+					if (node.c[i]) Tree2d.clean(node.c[i]);
+					else delete node.c[i];
+				}
+				return node;
+			},
+			
+			add: function(parent, node) {
+				node = Tree2d.copy(node) || {};
 				
-				add: function(parent, node) {
-					node = Tree2d.copy(node) || {};
-					
-					if (!parent.c) parent.c = [];
-					parent.c.push(node);
-					node.parent = parent;
-					
-					if (!parent.child) {
-						parent.child = node;
+				if (!parent.c) parent.c = [];
+				parent.c.push(node);
+				node.parent = parent;
+				
+				if (!parent.child) {
+					parent.child = node;
+				} else {
+					var c = parent.child;
+					while (c.next) c = c.next;
+					c.next = node;
+				}
+				Tree2d.init(node);
+				
+				return node;
+			},
+			
+			del: function(node) {
+				var parent = node.parent;
+				if (parent) {
+					for (i in parent.c) {
+						if (parent.c[i] == node) {
+							parent.c[i] = 0;
+							delete parent.c[i];
+							break;
+						}
+					}
+					if (parent.child == node) {
+						parent.child = node.next;
 					} else {
 						var c = parent.child;
-						while (c.next) c = c.next;
-						c.next = node;
-					}
-					Tree2d.init(node);
-					
-					return node;
-				},
-				
-				del: function(node) {
-					var parent = node.parent;
-					if (parent) {
-						for (i in parent.c) {
-							if (parent.c[i] == node) {
-								parent.c[i] = 0;
-								delete parent.c[i];
-								break;
-							}
-						}
-						if (parent.child == node) {
-							parent.child = node.next;
-						} else {
-							var c = parent.child;
-							while (c.next && c.next != node) c = c.next;
-							c.next = node.next;
-						}
-					}
-				},
-				
-				select: function(node) {
-					var c = node.parent.child;
-					while (c) {
-						if (c != node) c.a = 0;
-						else if (c.a == 0) c.a = 1;
-						c = c.next;
-					}
-				},
-				
-				cycle: function() {
-					var n = Tree2d.root;
-					ctx.fillRect(0, 0, canvas.width, canvas.height);
-					ctx.save();
-					ctx.translate(canvas.width / 2, canvas.height / 2);
-					while (n) {
-						ctx.save();
-						ctx.translate(n.x, n.y);
-						ctx.rotate(n.r / 180 * Math.PI);
-						ctx.scale(n.zx, n.zy);
-						if (n.a) {
-							if (n.update) n.update(n);
-							if (n.draw) n.draw(n);
-						}
-						
-						if (n.a && n.child) {
-							n = n.child;
-						} else {
-							while (n) {
-								ctx.restore();
-								if (n.next) {
-									n = n.next;
-									break;
-								}
-								n = n.parent;
-							}
-						}
-					}
-					ctx.restore();
-				},
-				
-				findById: function(id) {
-					var n = Tree2d.root;
-					
-					while (n) {
-						if (n.id == id) {
-							return n;
-						} else if (n.child) {
-							n = n.child;
-						} else {
-							while (n) {
-								if (n.next) {
-									n = n.next;
-									break;
-								}
-								n = n.parent;
-							}
-						}
-					}
-				},
-				
-				findByName: function(name) {
-					var n = Tree2d.root;
-					
-					while (n) {
-						if (n.name == name) {
-							return n;
-						} else if (n.child) {
-							n = n.child;
-						} else {
-							while (n) {
-								if (n.next) {
-									n = n.next;
-									break;
-								}
-								n = n.parent;
-							}
-						}
-					}
-				},
-				
-				getScreenTransform: function(node) {
-					var trans = {x:0,y:0,zx:1,zy:1,r:0};
-					var parent = node.parent;
-					var x = node.x, y = node.y;
-					var r = node.r;
-					var zx = node.zx, zy = node.zy;
-					
-					while (parent) {
-						var si = Math.sin(parent.r * Math.PI / 180);
-						var co = Math.cos(parent.r * Math.PI / 180);
-						trans.x = parent.x + (x*parent.zx*co - y*parent.zy*si);
-						trans.y = parent.y + (x*parent.zx*si + y*parent.zy*co);
-						trans.r = parent.r + r;
-						trans.zx = parent.zx * zx;
-						trans.zy = parent.zy * zy;
-						
-						x = trans.x;
-						y = trans.y;
-						r = trans.r;
-						zx = trans.zx;
-						zy = trans.zy;
-						
-						parent = parent.parent;
-					}
-					
-					return trans;
-				},
-				
-				convertPointToNodeTransform: function(node, pos) {
-					var t = Tree2d.getScreenTransform(node);
-					var dx = pos.x - t.x;
-					var dy = pos.y - t.y;
-					var d = Math.sqrt(dx * dx + dy * dy);
-					var r = Math.atan2(dy, dx) / Math.PI * 180;
-					var si = Math.sin((t.r-r) * Math.PI / 180);
-					var co = Math.cos((t.r-r) * Math.PI / 180);
-					var x = d * co;
-					var y = d * si;
-					return {x:x / t.zx, y:-y / t.zy};
-				},
-				
-				getClickedObject: function(pos) {
-					var n = Tree2d.root;
-					var arr = [];
-					
-					while (n) {
-						if (n.width && n.height) arr.push(n);
-						if (n.a && n.child) {
-							n = n.child;
-						} else {
-							while (n) {
-								if (n.next) {
-									n = n.next;
-									break;
-								}
-								n = n.parent;
-							}
-						}
-					}
-					
-					arr = arr.reverse();
-					for (i in arr) {
-						n = arr[i];
-						var t = Tree2d.getScreenTransform(n);
-						var si = Math.sin(t.r * Math.PI / 180);
-						var co = Math.cos(t.r * Math.PI / 180);
-						var xp = [];
-						var yp = [];
-						var w = n.width / 2, h = n.height / 2;
-						xp.push(t.x + t.zx * w * co - t.zy * h * si);
-						yp.push(t.y + t.zx * w * si + t.zy * h * co);
-						w = -w;
-						xp.push(t.x + t.zx * w * co - t.zy * h * si);
-						yp.push(t.y + t.zx * w * si + t.zy * h * co);
-						h = -h;
-						xp.push(t.x + t.zx * w * co - t.zy * h * si);
-						yp.push(t.y + t.zx * w * si + t.zy * h * co);
-						w = -w;
-						xp.push(t.x + t.zx * w * co - t.zy * h * si);
-						yp.push(t.y + t.zx * w * si + t.zy * h * co);
-						
-						if (pnpoly(4, xp, yp, pos.x, pos.y)) return n;
-					}
-				},
-				
-				genHierarhy: function() {
-					var n = Tree2d.root, str = '', t = -1;
-					
-					while (n) {
-						t++;
-						
-						var s = '', i = 0;
-						for (i = 0; i < t; i++) s += '-';
-						var name = n.name;
-						if (!n.name || name == '')  name = '';
-						else name = ' ' + name;
-						if (n.class) name += ' [' + n.class + ']';
-						else name += ' [Node]';
-						str += '<option value="' + n.id + '">' + s + name + '</option>\n';
-						
-						if (n.child) {
-							n = n.child;
-						} else {
-							while (n) {
-								t--;
-								if (n.next) {
-									n = n.next;
-									break;
-								}
-								n = n.parent;
-							}
-						}
-					}
-					
-					return str;
-				}
-			}
-			
-			var lib = {
-				images:{},
-				assets:{},
-				selected:{},
-				selectedCnt: 0,
-				brush: {timeout:10, ready:true, random:0, grid:0, drag:false, t:0},
-				pickup: false,
-				loadImage: function(name) {
-					if (lib.images[name]) return lib.images[name];
-					lib.images[name] = new Image;
-					lib.images[name].src = name;
-					if (!lib.assets[name]) lib.loadSprite(name);
-					return lib.images[name];
-				},
-				alignAssetSize: function(img, size) {
-					var d = img.width / img.height;
-					if (img.width > img.height) {
-						img.width = size;
-						img.height = size / d;
-						img.vspace = size / 2 - img.height / 2;
-					} else {
-						img.height = size;
-						img.width = size * d;
-						img.hspace = size / 2 - img.width / 2;
-					}
-				},
-				selectAsset: function(name) {
-					if (!lib.selected[name]) {
-						lib.selected[name] = lib.assets[name];
-						lib.selectedCnt++;
-						document.getElementById(name).style.border = "2px solid #6468D1";
-					} else {
-						lib.selected[name] = 0;
-						delete lib.selected[name];
-						lib.selectedCnt--;
-						document.getElementById(name).style.border = "2px solid #f7f4a0";
-					}
-				},
-				loadSprite: function(name) {
-					if (lib.assets[name]) return lib.assets[name];
-					
-					lib.assets[name] = {src: name, class: 'Sprite'};
-					lib.loadImage(name);
-					
-					document.getElementById('assets').innerHTML += '<div id="'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white;" onclick="lib.selectAsset(\''+name+'\')" ><img src="'+name+'" ondblclick="placeAsset(\''+name+'\')" onload="lib.alignAssetSize(this, 60)" /></div>';
-					return lib.assets[name];
-				},
-				addAssetFromString: function(name, str) {
-					var node = JSON.parse(str);
-					lib.assets[name] = node;
-					
-					var withoutExt = name.substr(0, name.lastIndexOf('.'));
-					withoutExt = withoutExt.charAt(0).toUpperCase() + withoutExt.substr(1);
-					document.getElementById('assets').innerHTML += '<div id= "'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white; font-size: small; text-align:center;" ondblclick="placeAsset(\''+name+'\')" onclick="lib.selectAsset(\''+name+'\')" ><br />'+withoutExt+'</div>';
-				},
-				loadNode: function(name, file) {
-					if (lib.assets[name]) return lib.assets[name];
-					
-					var reader = new FileReader();
-					reader.onload = function(e) {
-						lib.addAssetFromString(name, e.target.result);
-					}
-					var result = reader.readAsText(file);
-					
-					return lib.assets[name];
-				},
-				load: function(evt) {
-					var files = evt.target.files;
-					for (var i = 0, f; f = files[i]; i++) {
-						var name = f.name.substr(f.name.lastIndexOf('/') + 1);
-						if (f.type == 'image/png' || f.type == 'image/jpeg') {
-							lib.loadSprite(name);
-						} else if (f.type == 'application/json') {
-							lib.loadNode(name, f);
-						}
-					}
-				},
-				loadProject: function(evt) {
-					var file = evt.target.files[0];
-					var withoutExt = file.name.substr(0, file.name.lastIndexOf('.'));
-					
-					var reader = new FileReader();
-					reader.onload = function(e) {
-						var node = JSON.parse(e.target.result);
-						Tree2d.init(node);
-						root = Tree2d.root = node;
-						
-						document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
-						document.getElementById('hierarhy').value = 0;
-						select(node.id);
-						
-						if (!node.width) node.width = 512;
-						if (!node.height) node.height = 512;
-						canvas.width = node.width;
-						canvas.height = node.height;
-					}
-					var result = reader.readAsText(file);
-				},
-				saveProject: function() {
-					var text = JSON.stringify(Tree2d.clean(Tree2d.copy(Tree2d.root)));
-					var pom = document.createElement('a');
-					pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
-					pom.setAttribute('download', root.name + '.json');
-					pom.setAttribute('type', 'application/json');
-					pom.click();
-				},
-				mousePress: function(pos) {
-					if (lib.selectedCnt == 0) {
-						lib.pickup = true;
-						if (selected.parent) {
-							lib.tmpMousePos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
-							lib.tmpSelectedTrans = {x: selected.x, y: selected.y, r: selected.r, zx: selected.zx, zy:selected.zy};
-						}
-					} else {
-						lib.brush.drag = true;
-						if (!lib.brush.grid) lib.brush.grid = 1;
-						if (!lib.grid) lib.grid = 1;
-						if (selected != root) pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
-						pos.x = Math.floor((pos.x + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
-						pos.y = Math.floor((pos.y + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
-						pos.x += Math.random() * lib.brush.random * 2 - lib.brush.random;
-						pos.y += Math.random() * lib.brush.random * 2 - lib.brush.random;
-						lib.brush.dragPos = pos;
-						lib.pasteAsset(pos);
-						lib.brush.t = lib.brush.timeout;
-					}
-				},
-				mouseMove: function(pos) {
-					if (lib.pickup && selected.parent) {
-						if (!lib.brush.grid) lib.brush.grid = 1;
-						pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
-						if (event.shiftKey) {
-							var dx1 = lib.tmpMousePos.x - lib.tmpSelectedTrans.x;
-							var dy1 = lib.tmpMousePos.y - lib.tmpSelectedTrans.y;
-							var d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
-							var dx2 = pos.x - lib.tmpSelectedTrans.x;
-							var dy2 = pos.y - lib.tmpSelectedTrans.y;
-							var d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-							var d = d2 / d1;
-							set(selected, 'zx', lib.tmpSelectedTrans.zx * d);
-							set(selected, 'zy', lib.tmpSelectedTrans.zy * d);
-						} else if (event.ctrlKey) {
-							var r = Math.atan2(pos.y - lib.tmpSelectedTrans.y, pos.x - lib.tmpSelectedTrans.x) / Math.PI * 180;
-							set(selected, 'r', lib.tmpSelectedTrans.r + r);
-						} else {
-							var x = lib.tmpSelectedTrans.x + (pos.x - lib.tmpMousePos.x);
-							var y = lib.tmpSelectedTrans.y + (pos.y - lib.tmpMousePos.y);
-							var x1 = Math.floor((x + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
-							var y1 = Math.floor((y + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
-							if (Math.abs(x1 - x) < 10) x = x1;
-							if (Math.abs(y1 - y) < 10) y = y1;
-							set(selected, 'x', x);
-							set(selected, 'y', y);
-						}
-					} else if (lib.brush.drag && lib.brush.ready) {
-						if (lib.brush.t > 0) {
-							lib.brush.t--;
-							return;
-						}
-						if (selected != root) pos = Tree2d.convertPointToNodeTransform(selected.parent, pos);
-						if (Math.abs(pos.x - lib.brush.dragPos.x) > lib.brush.grid * 0.75 || Math.abs(pos.y - lib.brush.dragPos.y) > lib.brush.grid * 0.75) {
-							if (!lib.grid) lib.grid = 1;
-							pos.x = Math.floor((pos.x + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
-							pos.y = Math.floor((pos.y + lib.brush.grid / 2) / lib.brush.grid) * lib.brush.grid;
-							pos.x += Math.random() * lib.brush.random* 2 - lib.brush.random;
-							pos.y += Math.random() * lib.brush.random * 2 - lib.brush.random;
-							lib.brush.dragPos = pos;
-							lib.pasteAsset(pos);
-						}
-						lib.brush.t = lib.brush.timeout;
-					}
-				},
-				mouseRelease: function(pos) {
-					lib.brush.drag = false;
-					lib.pickup = false;
-				},
-				pick: function(pos) {
-					var c = Tree2d.getClickedObject(pos);
-					if (lib.selectedCnt == 0) {
-						if (c) select(c.id);
-						else select(Tree2d.root.id);
-					} else {
-						if (c && c.parent == selected) lib.del(c);
-					}
-				},
-				drag: function(pos) {
-					if (lib.selectedCnt != 0) {
-						var c = Tree2d.getClickedObject(pos);
-						if (c && c.parent == selected) lib.del(c);
-					}
-				},
-				unpick: function() {
-				},
-				pasteAsset: function(pos) {
-					var c = getRandField(lib.selected);
-					pos = Tree2d.convertPointToNodeTransform(selected, pos);
-					c.x = pos.x// - canvas.width/2;
-					c.y = pos.y// - canvas.height/2;
-					Tree2d.add(selected, c);
-					document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
-					document.getElementById('hierarhy').value = selected.id;
-				},
-				del: function(c) {
-					if (!c.parent) return;
-					if (c == selected) select(selected.parent.id);
-					Tree2d.del(c);
-					document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
-					select(selected.id);
-				},
-				setGrid: function(input) {
-					lib.brush.grid = parseFloat(input.value);
-					input.title = lib.brush.grid;
-				},
-				setBrushRandom: function(input) {
-					lib.brush.random = parseFloat(input.value);
-					input.title = lib.brush.random;
-				},
-				setBrushDelay: function(input) {
-					lib.brush.timeout = parseFloat(input.value);
-					input.title = lib.brush.timeout;
-				},
-				raise: function(node) {
-					if (node.next) lib.fall(node.next);
-				},
-				fall: function(node) {
-					if (!node.parent) return;
-					var p = node.parent, i, j;
-					for (i in p.c) {
-						if (p.c[i] == node) break;
-						j = i;
-					}
-					if (j) {
-						var c = p.c[i];
-						p.c[i] = p.c[j];
-						p.c[j] = c;
-						for (i in p.c) if (p.c[i].next) delete p.c[i].next;
-						
-						var prev;
-						for (i in p.c) {
-							var val = p.c[i];
-							if (!val.parent) val.parent = p;
-							if (!prev) p.child = val;
-							else prev.next = val;
-							prev = val;
-						}
-					}
-					
-					document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
-					select(selected.id);
-				}
-			};
-			
-			function select(id) {
-				id = parseFloat(id);
-				selected = Tree2d.findById(id);
-				document.getElementById('info').innerHTML = genInfo(selected, ['id', 'src', 'class']);
-				document.getElementById('hierarhy').value = id;
-			}
-			
-			function set(node, param, value) {
-				if (typeof(value) === 'boolean') {
-					node[param] = (value?1:0);
-					document.getElementById('edit-'+param).value = node[param];
-					document.getElementById('edit-'+param+'-checkbox').checked = (node[param]>0?true:false);
-				} else if (typeof node[param] === 'number') {
-					if (typeof parseFloat(value) === 'number') {
-						node[param] = parseFloat(value);
-						if (node == selected && (param == 'width' || param == 'height')) {
-							canvas.width = node.width;
-							canvas.height = node.height;
-						}
-					}
-					document.getElementById('edit-'+param).value = node[param];
-					if (document.getElementById('edit-'+param+'-checkbox')) document.getElementById('edit-'+param+'-checkbox').checked = (node[param]>0?true:false);
-				} else node[param] = value;
-				if (param == 'name') {
-					document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
-					document.getElementById('hierarhy').value = node.id;
-				}
-			}
-			
-			function genInfo(node, excluded) {
-				var str = '\
-				<input type="text" onclick="this.select()" onchange="set(selected,\'name\',this.value)" id="edit-name" value="'+(node.name?node.name:'')+'" /> Name<br />\
-				<input style="width:80px" type="number" onclick="this.select()" onchange="set(selected,\'x\',this.value)" id="edit-x" value="'+node.x+'" />\
-				<input style="width:80px" type="number" onclick="this.select()" onchange="set(selected,\'y\',this.value)" id="edit-y" value="'+node.y+'" /> Position<br />\
-				<input style="width:80px" type="number" onclick="this.select()" onchange="set(selected,\'zx\',this.value)" id="edit-zx" value="'+node.zx+'" />\
-				<input style="width:80px" type="number" onclick="this.select()" onchange="set(selected,\'zy\',this.value)" id="edit-zy" value="'+node.zy+'" /> Scale<br />\
-				<input type="number" onclick="this.select()" onchange="set(selected,\'r\',this.value)" id="edit-r" value="'+node.r+'" /> Rotation<br />\
-				<input type="range" onchange="set(selected,\'a\',this.value)" id="edit-a" min="0" max="1" step="0.05" value="'+node.a+'" />\
-				<input type="checkbox" onclick="this.select()" onchange="set(selected,\'a\',this.checked)" id="edit-a-checkbox" '+(node.a>0?"checked":"")+' /> Opacity<br />\
-				';
-				for (i in node) {
-					var flag = '';
-					for (j in excluded) if (i == excluded[j]) flag = 'readonly';
-					if (i == 'x' || i == 'y' || i == 'r' || i == 'zx' || i == 'zy' || i == 'a') {
-					} else if (typeof node[i] == 'number' && i != 'id') {
-						var name = i;
-						if (i.length > 1) name = i.charAt(0).toUpperCase() + i.substr(1);
-						str += '<input '+flag+' type="number" onclick="this.select()" onchange="set(selected,\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /> '+name+'<br />';
+						while (c.next && c.next != node) c = c.next;
+						c.next = node.next;
 					}
 				}
-				for (i in node) {
-					var flag = '';
-					for (j in excluded) if (i == excluded[j]) flag = 'readonly';
-					if (typeof node[i] == 'string' && i != 'name') {
-						var name = i;
-						if (i.length > 1) name = i.charAt(0).toUpperCase() + i.substr(1);
-						str += '<input '+flag+' type="text" onclick="this.select()" onchange="set(selected,\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /> '+name+'<br />';
-					}
-				}
-				return str;
-			}
+			},
 			
-			function placeAsset(name) {
-				var c = Tree2d.add(selected, lib.assets[name]);
-				document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
-				select(c.id);
-			}
-			
-			function getRandField(obj) {
-				var size = 0;
-				for (i in obj) if (typeof obj == 'object') {
-					size++;
+			select: function(node) {
+				var c = node.parent.child;
+				while (c) {
+					if (c != node) c.a = 0;
+					else if (c.a == 0) c.a = 1;
+					c = c.next;
 				}
-				var n = Math.floor(Math.random() * size), k = 0;
-				for (i in obj) {
-					if (k == n) return obj[i];
-					k++;
-				}
-			}
+			},
 			
-			function debugCycle() {
-				var n = root;
+			cycle: function() {
+				var n = ed.root;
 				ctx.save();
 				ctx.fillRect(0, 0, canvas.width, canvas.height);
 				ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -686,7 +166,522 @@
 					ctx.rotate(n.r / 180 * Math.PI);
 					ctx.scale(n.zx, n.zy);
 					if (n.a) {
-						if (run && n.update) n.update(n);
+						if (n.update) n.update(n);
+						if (n.draw) n.draw(n);
+					}
+					
+					if (n.a && n.child) {
+						n = n.child;
+					} else {
+						while (n) {
+							ctx.restore();
+							if (n.next) {
+								n = n.next;
+								break;
+							}
+							n = n.parent;
+						}
+					}
+				}
+				ctx.restore();
+			},
+			
+			findById: function(id) {
+				var n = Tree2d.root;
+				
+				while (n) {
+					if (n.id == id) {
+						return n;
+					} else if (n.child) {
+						n = n.child;
+					} else {
+						while (n) {
+							if (n.next) {
+								n = n.next;
+								break;
+							}
+							n = n.parent;
+						}
+					}
+				}
+			},
+			
+			findByName: function(name) {
+				var n = Tree2d.root;
+				
+				while (n) {
+					if (n.name == name) {
+						return n;
+					} else if (n.child) {
+						n = n.child;
+					} else {
+						while (n) {
+							if (n.next) {
+								n = n.next;
+								break;
+							}
+							n = n.parent;
+						}
+					}
+				}
+			},
+			
+			getScreenTransform: function(node) {
+				var trans = {x:0,y:0,zx:1,zy:1,r:0};
+				var parent = node.parent;
+				var x = node.x, y = node.y;
+				var r = node.r;
+				var zx = node.zx, zy = node.zy;
+				
+				while (parent) {
+					var si = Math.sin(parent.r * Math.PI / 180);
+					var co = Math.cos(parent.r * Math.PI / 180);
+					trans.x = parent.x + (x*parent.zx*co - y*parent.zy*si);
+					trans.y = parent.y + (x*parent.zx*si + y*parent.zy*co);
+					trans.r = parent.r + r;
+					trans.zx = parent.zx * zx;
+					trans.zy = parent.zy * zy;
+					
+					x = trans.x;
+					y = trans.y;
+					r = trans.r;
+					zx = trans.zx;
+					zy = trans.zy;
+					
+					parent = parent.parent;
+				}
+				
+				return trans;
+			},
+			
+			convertPointToNodeTransform: function(node, pos) {
+				var t = Tree2d.getScreenTransform(node);
+				var dx = pos.x - t.x;
+				var dy = pos.y - t.y;
+				var d = Math.sqrt(dx * dx + dy * dy);
+				var r = Math.atan2(dy, dx) / Math.PI * 180;
+				var si = Math.sin((t.r-r) * Math.PI / 180);
+				var co = Math.cos((t.r-r) * Math.PI / 180);
+				var x = d * co;
+				var y = d * si;
+				return {x:x / t.zx, y:-y / t.zy};
+			},
+			
+			getClickedObject: function(pos) {
+				var n = Tree2d.root;
+				var arr = [];
+				
+				while (n) {
+					if (n.width && n.height) arr.push(n);
+					if (n.a && n.child) {
+						n = n.child;
+					} else {
+						while (n) {
+							if (n.next) {
+								n = n.next;
+								break;
+							}
+							n = n.parent;
+						}
+					}
+				}
+				
+				arr = arr.reverse();
+				for (i in arr) {
+					n = arr[i];
+					var t = Tree2d.getScreenTransform(n);
+					var si = Math.sin(t.r * Math.PI / 180);
+					var co = Math.cos(t.r * Math.PI / 180);
+					var xp = [];
+					var yp = [];
+					var w = n.width / 2, h = n.height / 2;
+					xp.push(t.x + t.zx * w * co - t.zy * h * si);
+					yp.push(t.y + t.zx * w * si + t.zy * h * co);
+					w = -w;
+					xp.push(t.x + t.zx * w * co - t.zy * h * si);
+					yp.push(t.y + t.zx * w * si + t.zy * h * co);
+					h = -h;
+					xp.push(t.x + t.zx * w * co - t.zy * h * si);
+					yp.push(t.y + t.zx * w * si + t.zy * h * co);
+					w = -w;
+					xp.push(t.x + t.zx * w * co - t.zy * h * si);
+					yp.push(t.y + t.zx * w * si + t.zy * h * co);
+					
+					if (pnpoly(4, xp, yp, pos.x, pos.y)) return n;
+				}
+			},
+			
+			raise: function(node) {
+				if (node.next) Tree2d.fall(node.next);
+			},
+			fall: function(node) {
+				if (!node.parent) return;
+				var p = node.parent, i, j;
+				for (i in p.c) {
+					if (p.c[i] == node) break;
+					j = i;
+				}
+				if (j) {
+					var c = p.c[i];
+					p.c[i] = p.c[j];
+					p.c[j] = c;
+					for (i in p.c) if (p.c[i].next) delete p.c[i].next;
+					
+					var prev;
+					for (i in p.c) {
+						var val = p.c[i];
+						if (!val.parent) val.parent = p;
+						if (!prev) p.child = val;
+						else prev.next = val;
+						prev = val;
+					}
+				}
+			}
+		}
+		
+		var ed = {
+			run: false,
+			root: Tree2d.root,
+			selected: undefined,
+			images: {},
+			assets: {},
+			selectedAssets: {},
+			selectedAssetsCnt: 0,
+			brush: {timeout:10, ready:true, random:0, grid:0, drag:false, t:0},
+			pickup: false,
+			loadImage: function(name) {
+				if (ed.images[name]) return ed.images[name];
+				ed.images[name] = new Image;
+				ed.images[name].src = name;
+				if (!ed.assets[name]) ed.loadSprite(name);
+				return ed.images[name];
+			},
+			alignAssetSize: function(img, size) {
+				var d = img.width / img.height;
+				if (img.width > img.height) {
+					img.width = size;
+					img.height = size / d;
+					img.vspace = size / 2 - img.height / 2;
+				} else {
+					img.height = size;
+					img.width = size * d;
+					img.hspace = size / 2 - img.width / 2;
+				}
+			},
+			selectAsset: function(name) {
+				if (!ed.selectedAssets[name]) {
+					ed.selectedAssets[name] = ed.assets[name];
+					ed.selectedAssetsCnt++;
+					document.getElementById(name).style.border = "2px solid #6468D1";
+				} else {
+					ed.selectedAssets[name] = 0;
+					delete ed.selectedAssets[name];
+					ed.selectedAssetsCnt--;
+					document.getElementById(name).style.border = "2px solid #f7f4a0";
+				}
+			},
+			loadSprite: function(name) {
+				if (ed.assets[name]) return ed.assets[name];
+				
+				ed.assets[name] = {src: name, class: 'Sprite'};
+				ed.loadImage(name);
+				
+				document.getElementById('assets').innerHTML += '<div id="'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white;" onclick="ed.selectAsset(\''+name+'\')" ><img src="'+name+'" ondblclick="ed.placeAsset(\''+name+'\')" onload="ed.alignAssetSize(this, 60)" /></div>';
+				return ed.assets[name];
+			},
+			addAssetFromString: function(name, str) {
+				var node = JSON.parse(str);
+				ed.assets[name] = node;
+				
+				var withoutExt = name.substr(0, name.lastIndexOf('.'));
+				withoutExt = withoutExt.charAt(0).toUpperCase() + withoutExt.substr(1);
+				document.getElementById('assets').innerHTML += '<div id= "'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white; font-size: small; text-align:center;" ondblclick="ed.placeAsset(\''+name+'\')" onclick="ed.selectAsset(\''+name+'\')" ><br />'+withoutExt+'</div>';
+			},
+			loadNode: function(name, file) {
+				if (ed.assets[name]) return ed.assets[name];
+				
+				var reader = new FileReader();
+				reader.onload = function(e) {
+					ed.addAssetFromString(name, e.target.result);
+				}
+				var result = reader.readAsText(file);
+				
+				return ed.assets[name];
+			},
+			load: function(evt) {
+				var files = evt.target.files;
+				for (var i = 0, f; f = files[i]; i++) {
+					var name = f.name.substr(f.name.lastIndexOf('/') + 1);
+					if (f.type == 'image/png' || f.type == 'image/jpeg') {
+						ed.loadSprite(name);
+					} else if (f.type == 'application/json') {
+						ed.loadNode(name, f);
+					}
+				}
+			},
+			loadProject: function(evt) {
+				var file = evt.target.files[0];
+				var withoutExt = file.name.substr(0, file.name.lastIndexOf('.'));
+				
+				var reader = new FileReader();
+				reader.onload = function(e) {
+					var node = JSON.parse(e.target.result);
+					Tree2d.init(node);
+					ed.root = Tree2d.root = node;
+					
+					ed.renewHierarhy();
+					ed.select(node.id);
+					
+					if (!node.width) node.width = 512;
+					if (!node.height) node.height = 512;
+					canvas.width = node.width;
+					canvas.height = node.height;
+				}
+				var result = reader.readAsText(file);
+			},
+			saveProject: function() {
+				var text = JSON.stringify(Tree2d.clean(Tree2d.copy(Tree2d.root)));
+				var pom = document.createElement('a');
+				pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+				pom.setAttribute('download', ed.root.name + '.json');
+				pom.setAttribute('type', 'application/json');
+				pom.click();
+			},
+			mousePress: function(pos) {
+				if (ed.selectedAssetsCnt == 0) {
+					ed.pickup = true;
+					if (ed.selected.parent) {
+						ed.tmpMousePos = Tree2d.convertPointToNodeTransform(ed.selected.parent, pos);
+						ed.tmpSelectedTrans = {x: ed.selected.x, y: ed.selected.y, r: ed.selected.r, zx: ed.selected.zx, zy:ed.selected.zy};
+					}
+				} else {
+					ed.brush.drag = true;
+					if (!ed.brush.grid) ed.brush.grid = 1;
+					if (!ed.grid) ed.grid = 1;
+					if (ed.selected != ed.root) pos = Tree2d.convertPointToNodeTransform(ed.selected.parent, pos);
+					pos.x = Math.floor((pos.x + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
+					pos.y = Math.floor((pos.y + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
+					pos.x += Math.random() * ed.brush.random * 2 - ed.brush.random;
+					pos.y += Math.random() * ed.brush.random * 2 - ed.brush.random;
+					ed.brush.dragPos = pos;
+					ed.pasteAsset(pos);
+					ed.brush.t = ed.brush.timeout;
+				}
+			},
+			mouseMove: function(pos) {
+				if (ed.pickup && ed.selected.parent) {
+					if (!ed.brush.grid) ed.brush.grid = 1;
+					pos = Tree2d.convertPointToNodeTransform(ed.selected.parent, pos);
+					if (event.shiftKey) {
+						var dx1 = ed.tmpMousePos.x - ed.tmpSelectedTrans.x;
+						var dy1 = ed.tmpMousePos.y - ed.tmpSelectedTrans.y;
+						var d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+						var dx2 = pos.x - ed.tmpSelectedTrans.x;
+						var dy2 = pos.y - ed.tmpSelectedTrans.y;
+						var d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+						var d = d2 / d1;
+						ed.set('zx', ed.tmpSelectedTrans.zx * d);
+						ed.set('zy', ed.tmpSelectedTrans.zy * d);
+					} else if (event.ctrlKey) {
+						var r = Math.atan2(pos.y - ed.tmpSelectedTrans.y, pos.x - ed.tmpSelectedTrans.x) / Math.PI * 180;
+						ed.set('r', ed.tmpSelectedTrans.r + r);
+					} else {
+						var x = ed.tmpSelectedTrans.x + (pos.x - ed.tmpMousePos.x);
+						var y = ed.tmpSelectedTrans.y + (pos.y - ed.tmpMousePos.y);
+						var x1 = Math.floor((x + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
+						var y1 = Math.floor((y + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
+						if (Math.abs(x1 - x) < 10) x = x1;
+						if (Math.abs(y1 - y) < 10) y = y1;
+						ed.set('x', x);
+						ed.set('y', y);
+					}
+				} else if (ed.brush.drag && ed.brush.ready) {
+					if (ed.brush.t > 0) {
+						ed.brush.t--;
+						return;
+					}
+					if (ed.selected != ed.root) pos = Tree2d.convertPointToNodeTransform(ed.selected.parent, pos);
+					if (Math.abs(pos.x - ed.brush.dragPos.x) > ed.brush.grid * 0.75 || Math.abs(pos.y - ed.brush.dragPos.y) > ed.brush.grid * 0.75) {
+						if (!ed.grid) ed.grid = 1;
+						pos.x = Math.floor((pos.x + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
+						pos.y = Math.floor((pos.y + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
+						pos.x += Math.random() * ed.brush.random* 2 - ed.brush.random;
+						pos.y += Math.random() * ed.brush.random * 2 - ed.brush.random;
+						ed.brush.dragPos = pos;
+						ed.pasteAsset(pos);
+					}
+					ed.brush.t = ed.brush.timeout;
+				}
+			},
+			mouseRelease: function(pos) {
+				ed.brush.drag = false;
+				ed.pickup = false;
+			},
+			pick: function(pos) {
+				var c = Tree2d.getClickedObject(pos);
+				if (ed.selectedAssetsCnt == 0) {
+					if (c) ed.select(c.id);
+					else ed.select(Tree2d.root.id);
+				} else {
+					if (c && c.parent == ed.selected) ed.del(c);
+				}
+			},
+			drag: function(pos) {
+				if (ed.selectedAssetsCnt != 0) {
+					var c = Tree2d.getClickedObject(pos);
+					if (c && c.parent == ed.selected) ed.del(c);
+				}
+			},
+			unpick: function() {
+			},
+			pasteAsset: function(pos) {
+				var c = getRandField(ed.selectedAssets);
+				pos = Tree2d.convertPointToNodeTransform(ed.selected, pos);
+				c.x = pos.x// - canvas.width/2;
+				c.y = pos.y// - canvas.height/2;
+				Tree2d.add(ed.selected, c);
+				ed.renewHierarhy();
+			},
+			del: function(c) {
+				if (!c.parent) return;
+				if (c == ed.selected) ed.select(ed.selected.parent.id);
+				Tree2d.del(c);
+				ed.renewHierarhy();
+			},
+			setGrid: function(input) {
+				ed.brush.grid = parseFloat(input.value);
+				input.title = ed.brush.grid;
+			},
+			setBrushRandom: function(input) {
+				ed.brush.random = parseFloat(input.value);
+				input.title = ed.brush.random;
+			},
+			setBrushDelay: function(input) {
+				ed.brush.timeout = parseFloat(input.value);
+				input.title = ed.brush.timeout;
+			},
+			raise: function() {
+				Tree2d.fall(ed.selected);
+				ed.renewHierarhy();
+				ed.select(ed.selected.id);
+			},
+			fall: function(node) {
+				Tree2d.raise(ed.selected);
+				ed.renewHierarhy();
+			},
+			renewHierarhy: function() {
+				var n = Tree2d.root, str = '', t = -1;
+				
+				while (n) {
+					t++;
+					
+					var s = '', i = 0;
+					for (i = 0; i < t; i++) s += '-';
+					var name = n.name;
+					if (!n.name || name == '')  name = '';
+					else name = ' ' + name;
+					if (n.class) name += ' [' + n.class + ']';
+					else name += ' [Node]';
+					str += '<option value="' + n.id + '">' + s + name + '</option>\n';
+					
+					if (n.child) {
+						n = n.child;
+					} else {
+						while (n) {
+							t--;
+							if (n.next) {
+								n = n.next;
+								break;
+							}
+							n = n.parent;
+						}
+					}
+				}
+				
+				document.getElementById('hierarhy').innerHTML = str;
+				document.getElementById('hierarhy').value = ed.selected.id;
+			},
+			
+			select: function(id) {
+				id = parseFloat(id);
+				ed.selected = Tree2d.findById(id);
+				document.getElementById('hierarhy').value = id;
+				ed.updateInfo();
+			},
+			
+			set: function(param, value) {
+				var node = ed.selected;
+				if (typeof(value) === 'boolean') {
+					node[param] = (value?1:0);
+					document.getElementById('edit-'+param).value = node[param];
+					document.getElementById('edit-'+param+'-checkbox').checked = (node[param]>0?true:false);
+				} else if (typeof node[param] === 'number') {
+					if (typeof parseFloat(value) === 'number') {
+						node[param] = parseFloat(value);
+						if (node == ed.selected && (param == 'width' || param == 'height')) {
+							canvas.width = node.width;
+							canvas.height = node.height;
+						}
+					}
+					document.getElementById('edit-'+param).value = node[param];
+					if (document.getElementById('edit-'+param+'-checkbox')) document.getElementById('edit-'+param+'-checkbox').checked = (node[param]>0?true:false);
+				} else node[param] = value;
+				if (param == 'name') ed.renewHierarhy();
+			},
+			
+			updateInfo: function() {
+				var node = ed.selected;
+				var excluded = ['id', 'src', 'class'];
+				var str = '\
+				<input type="text" onclick="this.select()" onchange="ed.set(\'name\',this.value)" id="edit-name" value="'+(node.name?node.name:'')+'" /> Name<br />\
+				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'x\',this.value)" id="edit-x" value="'+node.x+'" />\
+				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'y\',this.value)" id="edit-y" value="'+node.y+'" /> Position<br />\
+				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'zx\',this.value)" id="edit-zx" value="'+node.zx+'" />\
+				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'zy\',this.value)" id="edit-zy" value="'+node.zy+'" /> Scale<br />\
+				<input type="number" onclick="this.select()" onchange="ed.set(\'r\',this.value)" id="edit-r" value="'+node.r+'" /> Rotation<br />\
+				<input type="range" onchange="ed.set(\'a\',this.value)" id="edit-a" min="0" max="1" step="0.05" value="'+node.a+'" />\
+				<input type="checkbox" onclick="this.select()" onchange="ed.set(\'a\',this.checked)" id="edit-a-checkbox" '+(node.a>0?"checked":"")+' /> Opacity<br />\
+				';
+				for (i in node) {
+					var flag = '';
+					for (j in excluded) if (i == excluded[j]) flag = 'readonly';
+					if (i == 'x' || i == 'y' || i == 'r' || i == 'zx' || i == 'zy' || i == 'a') {
+					} else if (typeof node[i] == 'number' && i != 'id') {
+						var name = i;
+						if (i.length > 1) name = i.charAt(0).toUpperCase() + i.substr(1);
+						str += '<input '+flag+' type="number" onclick="this.select()" onchange="ed.set(\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /> '+name+'<br />';
+					}
+				}
+				for (i in node) {
+					var flag = '';
+					for (j in excluded) if (i == excluded[j]) flag = 'readonly';
+					if (typeof node[i] == 'string' && i != 'name') {
+						var name = i;
+						if (i.length > 1) name = i.charAt(0).toUpperCase() + i.substr(1);
+						str += '<input '+flag+' type="text" onclick="this.select()" onchange="ed.set(\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /> '+name+'<br />';
+					}
+				}
+				document.getElementById('info').innerHTML = str;
+			},
+			
+			placeAsset: function(name) {
+				var c = Tree2d.add(ed.selected, ed.assets[name]);
+				ed.select(c.id);
+				ed.renewHierarhy();
+			},
+			
+			cycle: function() {
+				var n = ed.root;
+				ctx.save();
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+				ctx.translate(canvas.width / 2, canvas.height / 2);
+				while (n) {
+					ctx.save();
+					ctx.translate(n.x, n.y);
+					ctx.rotate(n.r / 180 * Math.PI);
+					ctx.scale(n.zx, n.zy);
+					if (n.a) {
+						if (ed.run && n.update) n.update(n);
 						if (n.debugDraw) n.debugDraw(n);
 						else if (n.draw) n.draw(n);
 					}
@@ -695,10 +690,10 @@
 						n = n.child;
 					} else {
 						while (n) {
-							if (!run) {
+							if (!ed.run) {
 								if (n.width && n.height) {
 									ctx.strokeRect(-n.width / 2 - 1, -n.height / 2 - 1, n.width + 1, n.height + 1);
-									if (n == selected) {
+									if (n == ed.selected) {
 										ctx.beginPath();
 										ctx.moveTo(-n.width / 2, -n.height / 2);
 										ctx.lineTo(n.width / 2, n.height / 2);
@@ -707,7 +702,7 @@
 										ctx.stroke();
 									}
 								}
-								if (n == selected && n.c) {
+								if (n == ed.selected && n.c) {
 									ctx.lineWidth = 1;
 									ctx.beginPath();
 									for (i in n.c) {
@@ -729,64 +724,75 @@
 					}
 				}
 				ctx.restore();
-			}
+			},
 			
-			function getMousePos(canvas, evt) {
-				var rect = canvas.getBoundingClientRect();
-				return {
-					x: evt.clientX - rect.left - canvas.width / 2,
-					y: evt.clientY - rect.top - canvas.height / 2
-				};
-			}
-			
-			function runGame(btn) {
-				if (!run) {
-					root = Tree2d.copy(Tree2d.root);
-					Tree2d.init(root);
+			runGame: function(btn) {
+				if (!ed.run) {
+					ed.root = Tree2d.copy(Tree2d.root);
+					Tree2d.init(ed.root);
 					btn.value = 'Stop';
 				} else {
-					delete root;
-					root = Tree2d.root;
+					delete ed.root;
+					ed.root = Tree2d.root;
 					btn.value = 'Run';
 				}
-				run = !run;
+				ed.run = !ed.run;
 			}
-			
-			function pnpoly(npol, xp, yp, x, y) {
-				var i, j, c = false;
-				for (i = 0, j = npol-1; i < npol; j = i++) {
-					if ((((yp[i] <= y) && (y < yp[j])) ||
-					     ((yp[j] <= y) && (y < yp[i]))) &&
-					    (x < (xp[j] - xp[i]) * (y - yp[i]) / (yp[j] - yp[i]) + xp[i]))
-					    c =!c;
-				}
-				return c;
+		};
+		
+		function getRandField(obj) {
+			var size = 0;
+			for (i in obj) if (typeof obj == 'object') {
+				size++;
 			}
-			
-			function Sprite(node) {
-				node.img = lib.loadImage(node.src);
-				if (!node.width) node.width = node.img.width;
-				if (!node.height) node.height = node.img.height;
-				node.draw = function(node) {
-					ctx.drawImage(node.img, -node.width / 2, -node.height / 2);
-				}
+			var n = Math.floor(Math.random() * size), k = 0;
+			for (i in obj) {
+				if (k == n) return obj[i];
+				k++;
 			}
-			
-			canvas = document.getElementById("myCanvas");
-			canvas.addEventListener('mousedown', function(evt) {if (evt.button == 0) lib.mousePress(getMousePos(canvas, evt)); else lib.pick(getMousePos(canvas, evt));}, false);
-			canvas.addEventListener('mousemove', function(evt) {if (evt.button == 0) lib.mouseMove(getMousePos(canvas, evt)); else lib.drag(getMousePos(canvas, evt));}, false);
-			canvas.addEventListener('mouseup',   function(evt) {if (evt.button == 0) lib.mouseRelease(getMousePos(canvas, evt)); else lib.unpick();}, false);
-			canvas.addEventListener('mouseout',   function(evt) {if (evt.button == 0) lib.mouseRelease(0); else lib.unpick();}, false);
-			ctx = canvas.getContext("2d");
-			document.getElementById('files').addEventListener('change', lib.load, false);
-			document.getElementById('projectLoader').addEventListener('change', lib.loadProject, false);
-			document.getElementById('hierarhy').innerHTML = Tree2d.genHierarhy();
-			select(0);
-			ctx.strokeStyle = 'red';
-			ctx.lineWidth = 2;
-			lib.addAssetFromString('node.json', '{"class":"Node"}');
-			root = Tree2d.root;
-			setInterval(debugCycle, 10);
-		}</script>
-	</body>
+		}
+		
+		function getMousePos(canvas, evt) {
+			var rect = canvas.getBoundingClientRect();
+			return {
+				x: evt.clientX - rect.left - canvas.width / 2,
+				y: evt.clientY - rect.top - canvas.height / 2
+			};
+		}
+		
+		function pnpoly(npol, xp, yp, x, y) {
+			var i, j, c = false;
+			for (i = 0, j = npol-1; i < npol; j = i++) {
+				if ((((yp[i] <= y) && (y < yp[j])) ||
+				     ((yp[j] <= y) && (y < yp[i]))) &&
+				    (x < (xp[j] - xp[i]) * (y - yp[i]) / (yp[j] - yp[i]) + xp[i]))
+				    c =!c;
+			}
+			return c;
+		}
+		
+		function Sprite(node) {
+			node.img = ed.loadImage(node.src);
+			if (!node.width) node.width = node.img.width;
+			if (!node.height) node.height = node.img.height;
+			node.draw = function(node) {
+				ctx.drawImage(node.img, -node.width / 2, -node.height / 2);
+			}
+		}
+		
+		canvas = document.getElementById("myCanvas");
+		canvas.addEventListener('mousedown', function(evt) {if (evt.button == 0) ed.mousePress(getMousePos(canvas, evt)); else ed.pick(getMousePos(canvas, evt));}, false);
+		canvas.addEventListener('mousemove', function(evt) {if (evt.button == 0) ed.mouseMove(getMousePos(canvas, evt)); else ed.drag(getMousePos(canvas, evt));}, false);
+		canvas.addEventListener('mouseup',   function(evt) {if (evt.button == 0) ed.mouseRelease(getMousePos(canvas, evt)); else ed.unpick();}, false);
+		canvas.addEventListener('mouseout',   function(evt) {if (evt.button == 0) ed.mouseRelease(0); else ed.unpick();}, false);
+		ctx = canvas.getContext("2d");
+		document.getElementById('files').addEventListener('change', ed.load, false);
+		document.getElementById('projectLoader').addEventListener('change', ed.loadProject, false);
+		ctx.strokeStyle = 'red';
+		ctx.lineWidth = 2;
+		ed.select(0);
+		ed.renewHierarhy();
+		ed.addAssetFromString('node.json', '{"class":"Node"}');
+		setInterval(ed.cycle, 10);
+	}</script>
 </html>
