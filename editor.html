@@ -758,16 +758,17 @@
 				var node = ed.selected;
 				var excluded = ['id', 'src', 'class'];
 				var str = '\
-				<input type="text" onclick="this.select()" onchange="ed.set(\'name\',this.value)" id="edit-name" value="'+(node.name?node.name:'')+'" /> Name<br />\
-				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'x\',this.value)" id="edit-x" value="'+node.x+'" />\
-				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'y\',this.value)" id="edit-y" value="'+node.y+'" /> Position<br />\
-				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'zx\',this.value)" id="edit-zx" value="'+node.zx+'" />\
-				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'zy\',this.value)" id="edit-zy" value="'+node.zy+'" /> Scale<br />\
-				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'w\',this.value)" id="edit-w" value="'+node.w+'" />\
-				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'h\',this.value)" id="edit-h" value="'+node.h+'" /> Bounds<br />\
-				<input type="number" onclick="this.select()" onchange="ed.set(\'r\',this.value)" id="edit-r" value="'+node.r+'" /> Rotation<br />\
-				<input type="range" onchange="ed.set(\'a\',this.value)" id="edit-a" min="0" max="1" step="0.05" value="'+node.a+'" />\
-				<input type="checkbox" onclick="this.select()" onchange="ed.set(\'a\',this.checked)" id="edit-a-checkbox" '+(node.a>0?"checked":"")+' /> Opacity<br />\
+				<input type="text" value="Name" readonly /><input type="text" onclick="this.select()" onchange="ed.set(\'name\',this.value)" id="edit-name" value="'+(node.name?node.name:'')+'" /><br />\
+				<input type="text" value="Position" readonly /><input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'x\',this.value)" id="edit-x" value="'+node.x+'" />\
+				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'y\',this.value)" id="edit-y" value="'+node.y+'" /><br />\
+				<input type="text" value="Scale" readonly /><input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'zx\',this.value)" id="edit-zx" value="'+node.zx+'" />\
+				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'zy\',this.value)" id="edit-zy" value="'+node.zy+'" /><br />\
+				<input type="text" value="Bounds" readonly /><input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'w\',this.value)" id="edit-w" value="'+node.w+'" />\
+				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'h\',this.value)" id="edit-h" value="'+node.h+'" /><br />\
+				<input type="text" value="Rotation" readonly /><input type="number" onclick="this.select()" onchange="ed.set(\'r\',this.value)" id="edit-r" value="'+node.r+'" /><br />\
+				<input type="text" value="Opacity" readonly /><input type="range" onchange="ed.set(\'a\',this.value)" id="edit-a" min="0" max="1" step="0.05" value="'+node.a+'" />\
+				<input type="checkbox" onclick="this.select()" onchange="ed.set(\'a\',this.checked)" id="edit-a-checkbox" '+(node.a>0?"checked":"")+' /><br />\
+				Other attributes:<br /><table>\
 				';
 				for (i in node) {
 					var flag = '';
@@ -775,8 +776,7 @@
 					if (i == 'x' || i == 'y' || i == 'r' || i == 'zx' || i == 'zy' || i == 'a' || i == 'w' || i == 'h') {
 					} else if (typeof node[i] == 'number' && i != 'id') {
 						var name = i;
-						if (i.length > 1) name = i.charAt(0).toUpperCase() + i.substr(1);
-						str += '<input '+flag+' type="number" onclick="this.select()" onchange="ed.set(\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /> '+name+'<br />';
+						str += '<tr><td><input type="text" value="'+name+'" readonly /></td><td><input '+flag+' type="number" onclick="this.select()" onchange="ed.set(\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /></td><td><input type="button" value="-" onclick="ed.deleteAttr(\''+name+'\')"></td></tr>';
 					}
 				}
 				for (i in node) {
@@ -784,11 +784,38 @@
 					for (j in excluded) if (i == excluded[j]) flag = 'readonly';
 					if (typeof node[i] == 'string' && i != 'name') {
 						var name = i;
-						if (i.length > 1) name = i.charAt(0).toUpperCase() + i.substr(1);
-						str += '<input '+flag+' type="text" onclick="this.select()" onchange="ed.set(\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /> '+name+'<br />';
+						str += '<tr><td>'+name+'</td><td><input '+flag+' type="text" onclick="this.select()" onchange="ed.set(\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /></td></tr>';
 					}
 				}
+				str += '</table><input id="addAttributeName" type="text" placeholder="key" onkeydown="ed.trySubmit(event, \'addAttrBtn\')" /><input id="addAttrBtn" type="button" value="Add" onclick="ed.addAttribute()" />';
+				
+				
+				
 				document.getElementById('info').innerHTML = str;
+			},
+			
+			deleteAttr: function(name) {
+				delete ed.selected[name];
+				ed.updateInfo();
+			},
+			
+			trySubmit: function(event, id) {
+				if (event.keyCode == 13) {
+					document.getElementById(id).click();
+				}
+			},
+			
+			addAttribute: function() {
+				var name = document.getElementById('addAttributeName').value;
+				var excluded = ['x', 'y', 'r', 'w', 'h', 'zx', 'zy', 'a', 'src', 'id', 'class'];
+				for (i in excluded) {
+					if (excluded[i] == name) {
+						alert('Attribute name '+name+' is reserved.');
+						return;
+					}
+				}
+				ed.selected[name] = 0;
+				ed.updateInfo();
 			},
 			
 			// вставляет ассет с именем name в выделенную ноду на позиции (0, 0)
