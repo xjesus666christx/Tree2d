@@ -58,11 +58,11 @@
 				r:0,  // поворот в градусах
 				zx:1, // масштаб по горизонтали (1 - изначальный, 0.5 - в 2 раза меньше)
 				zy:1, // масштаб по вертикали
+				w:512, // ширина (прилаги)
+				h:512, // высота (прилаги)
 				a:1,  // степень непрозрачности (1 - непрозрачный, 0 - полностью прозрачный)
 				id:0, // уникальный ID, по нему осуществляется поиск
-				name:'root', // имя узла (по нему тоже можно искать узел в дереве)
-				width:512, // ширина прилаги
-				height:512 // высота прилаги
+				name:'root' // имя узла (по нему тоже можно искать узел в дереве)
 			},
 			
 			cid: 1, // текущий айдишник
@@ -101,6 +101,8 @@
 				if (!node.r) node.r = 0;
 				if (!node.zx) node.zx = 1;
 				if (!node.zy) node.zy = 1;
+				if (!node.w) node.w = 0;
+				if (!node.h) node.h = 0;
 				if (!node.a) node.a = 1;
 				if (!node.id) node.id = Tree2d.genId();
 				if (node.class) {
@@ -136,6 +138,8 @@
 				if (node.zx == 1) delete node.zx;
 				if (node.zy == 1) delete node.zy;
 				if (node.a == 1) delete node.a;
+				if (node.w == 0) delete node.w;
+				if (node.h == 0) delete node.h;
 				if (node.id) delete node.id;
 				for (i in node) {
 					if (typeof node[i] === 'number') {
@@ -213,6 +217,7 @@
 				ctx.translate(canvas.width / 2, canvas.height / 2);
 				while (n) {
 					ctx.save();
+					ctx.globalAlpha *= n.a;
 					ctx.translate(n.x, n.y);
 					ctx.rotate(n.r / 180 * Math.PI);
 					ctx.scale(n.zx, n.zy);
@@ -225,6 +230,7 @@
 						n = n.child;
 					} else {
 						while (n) {
+							ctx.globalAlpha /= n.a;
 							ctx.restore();
 							if (n.next) {
 								n = n.next;
@@ -331,7 +337,7 @@
 				var arr = [];
 				
 				while (n) {
-					if (n.width && n.height) arr.push(n);
+					if (n.a && n.w && n.w) arr.push(n);
 					if (n.a && n.child) {
 						n = n.child;
 					} else {
@@ -353,7 +359,7 @@
 					var co = Math.cos(t.r * Math.PI / 180);
 					var xp = [];
 					var yp = [];
-					var w = n.width / 2, h = n.height / 2;
+					var w = n.w / 2, h = n.w / 2;
 					xp.push(t.x + t.zx * w * co - t.zy * h * si);
 					yp.push(t.y + t.zx * w * si + t.zy * h * co);
 					w = -w;
@@ -520,10 +526,8 @@
 					ed.renewHierarhy();
 					ed.select(node.id);
 					
-					if (!node.width) node.width = 512;
-					if (!node.height) node.height = 512;
-					canvas.width = node.width;
-					canvas.height = node.height;
+					canvas.width = node.w;
+					canvas.height = node.h;
 				}
 				var result = reader.readAsText(file);
 			},
@@ -641,8 +645,8 @@
 			pasteAsset: function(pos) {
 				var c = getRandField(ed.selectedAssets);
 				pos = Tree2d.convertPointToNodeTransform(ed.selected, pos);
-				c.x = pos.x// - canvas.width/2;
-				c.y = pos.y// - canvas.height/2;
+				c.x = pos.x;
+				c.y = pos.y;
 				Tree2d.add(ed.selected, c);
 				ed.renewHierarhy();
 			},
@@ -738,9 +742,9 @@
 				} else if (typeof node[param] === 'number') {
 					if (typeof parseFloat(value) === 'number') {
 						node[param] = parseFloat(value);
-						if (node == ed.selected && (param == 'width' || param == 'height')) {
-							canvas.width = node.width;
-							canvas.height = node.height;
+						if (node == ed.root && (param == 'w' || param == 'h')) {
+							canvas.width = node.w;
+							canvas.height = node.h;
 						}
 					}
 					document.getElementById('edit-'+param).value = node[param];
@@ -759,6 +763,8 @@
 				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'y\',this.value)" id="edit-y" value="'+node.y+'" /> Position<br />\
 				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'zx\',this.value)" id="edit-zx" value="'+node.zx+'" />\
 				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'zy\',this.value)" id="edit-zy" value="'+node.zy+'" /> Scale<br />\
+				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'w\',this.value)" id="edit-w" value="'+node.w+'" />\
+				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'h\',this.value)" id="edit-h" value="'+node.h+'" /> Bounds<br />\
 				<input type="number" onclick="this.select()" onchange="ed.set(\'r\',this.value)" id="edit-r" value="'+node.r+'" /> Rotation<br />\
 				<input type="range" onchange="ed.set(\'a\',this.value)" id="edit-a" min="0" max="1" step="0.05" value="'+node.a+'" />\
 				<input type="checkbox" onclick="this.select()" onchange="ed.set(\'a\',this.checked)" id="edit-a-checkbox" '+(node.a>0?"checked":"")+' /> Opacity<br />\
@@ -766,7 +772,7 @@
 				for (i in node) {
 					var flag = '';
 					for (j in excluded) if (i == excluded[j]) flag = 'readonly';
-					if (i == 'x' || i == 'y' || i == 'r' || i == 'zx' || i == 'zy' || i == 'a') {
+					if (i == 'x' || i == 'y' || i == 'r' || i == 'zx' || i == 'zy' || i == 'a' || i == 'w' || i == 'h') {
 					} else if (typeof node[i] == 'number' && i != 'id') {
 						var name = i;
 						if (i.length > 1) name = i.charAt(0).toUpperCase() + i.substr(1);
@@ -814,16 +820,14 @@
 					} else {
 						while (n) {
 							if (!ed.run) {
-								if (n.width && n.height) {
-									ctx.strokeRect(-n.width / 2 - 1, -n.height / 2 - 1, n.width + 1, n.height + 1);
-									if (n == ed.selected) {
-										ctx.beginPath();
-										ctx.moveTo(-n.width / 2, -n.height / 2);
-										ctx.lineTo(n.width / 2, n.height / 2);
-										ctx.moveTo(-n.width / 2, n.height / 2);
-										ctx.lineTo(n.width / 2, -n.height / 2);
-										ctx.stroke();
-									}
+								ctx.strokeRect(-n.w / 2 - 1, -n.h / 2 - 1, n.w + 1, n.h + 1);
+								if (n == ed.selected) {
+									ctx.beginPath();
+									ctx.moveTo(-n.w / 2, -n.h / 2);
+									ctx.lineTo(n.w / 2, n.h / 2);
+									ctx.moveTo(-n.w / 2, n.h / 2);
+									ctx.lineTo(n.w / 2, -n.h / 2);
+									ctx.stroke();
 								}
 								if (n == ed.selected && n.c) {
 									ctx.lineWidth = 1;
@@ -902,10 +906,10 @@
 		// инициализирует узел - спрайт
 		function Sprite(node) {
 			node.img = ed.loadImage(node.src);
-			if (!node.width) node.width = node.img.width;
-			if (!node.height) node.height = node.img.height;
+			if (!node.w) node.w = node.img.width;
+			if (!node.h) node.h = node.img.height;
 			node.draw = function(node) {
-				ctx.drawImage(node.img, -node.width / 2, -node.height / 2);
+				ctx.drawImage(node.img, -node.w / 2, -node.h / 2);
 			}
 		}
 	}</script>
