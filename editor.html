@@ -29,14 +29,51 @@
 	<script>{
 		var canvas, ctx;
 		
+		onload = function() {
+			canvas = document.getElementById("myCanvas");
+			canvas.addEventListener('mousedown', function(evt) {if (evt.button == 0) ed.mousePress(getMousePos(canvas, evt)); else ed.pick(getMousePos(canvas, evt));}, false);
+			canvas.addEventListener('mousemove', function(evt) {if (evt.button == 0) ed.mouseMove(getMousePos(canvas, evt)); else ed.drag(getMousePos(canvas, evt));}, false);
+			canvas.addEventListener('mouseup',   function(evt) {if (evt.button == 0) ed.mouseRelease(getMousePos(canvas, evt)); else ed.unpick();}, false);
+			canvas.addEventListener('mouseout',   function(evt) {if (evt.button == 0) ed.mouseRelease(0); else ed.unpick();}, false);
+			ctx = canvas.getContext("2d");
+			document.getElementById('files').addEventListener('change', ed.load, false);
+			document.getElementById('projectLoader').addEventListener('change', ed.loadProject, false);
+			ctx.strokeStyle = 'red';
+			ctx.lineWidth = 2;
+			ed.select(0);
+			ed.renewHierarhy();
+			ed.addAssetFromString('node.json', '{"class":"Node"}');
+			setInterval(ed.cycle, 10);
+		}
+		
+		// основная либа для работы с внутриигровым деревом
+		// для содержания дерева есть 2 типа связей:
+		// 1. потомки node хранятся в массиве node.c
+		// 2. у node есть ссылки на parent (родителя), child (первого потомка) и next (соседа)
 		var Tree2d = {
-			root: {x:0, y:0, r:0, zx:1, zy:1, a:1, id:0, name:'root', width:512, height:512},
-			cid: 1,
+			// корневой узел
+			root: {
+				x:0,  // позиция по Х
+				y:0,  // позиция по Y
+				r:0,  // поворот в градусах
+				zx:1, // масштаб по горизонтали (1 - изначальный, 0.5 - в 2 раза меньше)
+				zy:1, // масштаб по вертикали
+				a:1,  // степень непрозрачности (1 - непрозрачный, 0 - полностью прозрачный)
+				id:0, // уникальный ID, по нему осуществляется поиск
+				name:'root', // имя узла (по нему тоже можно искать узел в дереве)
+				width:512, // ширина прилаги
+				height:512 // высота прилаги
+			},
 			
+			cid: 1, // текущий айдишник
+			
+			// генерирует уникальный айдишник - имя узла
 			genId: function() {
 				return Tree2d.cid++;
 			},
 			
+			// возвращает копию указанного узла
+			// рекурсивная
 			copy: function(node) {
 				var copy = {};
 				for (i in node) {
@@ -48,12 +85,16 @@
 				if (node && node.c) {
 					copy.c = [];
 					for (i in node.c) {
-						copy.c[i] = Tree2d.copy(node.c[i]);
+						if (node.c[i]) copy.c[i] = Tree2d.copy(node.c[i]);
 					}
 				}
 				return copy;
 			},
 			
+			// создает дефолтные поля, если их нет
+			// вызывает для каждой ноды ф-ю инициализации - имя класса
+			// создает в узле ссылки на родителя, соседа и потомка
+			// рекурсивная
 			init: function(node) {
 				if (!node.x) node.x = 0;
 				if (!node.y) node.y = 0;
@@ -72,6 +113,7 @@
 					var prev;
 					for (i in node.c) {
 						var val = node.c[i];
+						if (!val) console.log(node);
 						if (!val.parent) val.parent = node;
 						if (!prev) node.child = val;
 						else prev.next = val;
@@ -81,6 +123,9 @@
 				}
 			},
 			
+			// удаляет из узла дефолтные поля
+			// удаляет все внутренние объекты, кроме массива c[] (children)
+			// рекурсивная
 			clean: function(node) {
 				if (node.x == 0) delete node.x;
 				else node.x = Math.floor(node.x);
@@ -107,6 +152,9 @@
 				return node;
 			},
 			
+			// добавляет node в массив с (children) родителя
+			// перестраивает ссылки на следующий элемент среди потомков parent
+			// инициализирует node
 			add: function(parent, node) {
 				node = Tree2d.copy(node) || {};
 				
@@ -126,6 +174,7 @@
 				return node;
 			},
 			
+			// удаляет node из потомков его родителя
 			del: function(node) {
 				var parent = node.parent;
 				if (parent) {
@@ -146,6 +195,7 @@
 				}
 			},
 			
+			// всем потомкам родителя node, кроме node, выставляет opacity = 0
 			select: function(node) {
 				var c = node.parent.child;
 				while (c) {
@@ -155,8 +205,9 @@
 				}
 			},
 			
+			// действия за 1 кадр: отрисовка и апдейт
 			cycle: function() {
-				var n = ed.root;
+				var n = Tree2d.root;
 				ctx.save();
 				ctx.fillRect(0, 0, canvas.width, canvas.height);
 				ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -186,6 +237,7 @@
 				ctx.restore();
 			},
 			
+			// если узел с ID id не найден - вернет undefined
 			findById: function(id) {
 				var n = Tree2d.root;
 				
@@ -206,6 +258,7 @@
 				}
 			},
 			
+			// если узел с именем name не найден - вернет undefined
 			findByName: function(name) {
 				var n = Tree2d.root;
 				
@@ -226,6 +279,7 @@
 				}
 			},
 			
+			// получить позицию, поворот, скейл и непрозрачность отрисовки узла
 			getScreenTransform: function(node) {
 				var trans = {x:0,y:0,zx:1,zy:1,r:0};
 				var parent = node.parent;
@@ -254,6 +308,9 @@
 				return trans;
 			},
 			
+			// если бы точка была узлом и рисовалась бы в (pos.x, pos.y),
+			// то внутри node она имела бы позицию, поворот, скейл и непрозрачность,
+			// возвращенные этой ф-ей
 			convertPointToNodeTransform: function(node, pos) {
 				var t = Tree2d.getScreenTransform(node);
 				var dx = pos.x - t.x;
@@ -267,6 +324,8 @@
 				return {x:x / t.zx, y:-y / t.zy};
 			},
 			
+			// тут все просто: находит кликнутый объект
+			// если такого нет - возвращает undefined
 			getClickedObject: function(pos) {
 				var n = Tree2d.root;
 				var arr = [];
@@ -311,9 +370,14 @@
 				}
 			},
 			
+			// делает node на слой выше соседей
+			// влияет на порядок отрисовки, апдейта, нахождения кликнутого узла
 			raise: function(node) {
 				if (node.next) Tree2d.fall(node.next);
 			},
+			
+			// делает node на слой ниже соседей
+			// влияет на порядок отрисовки, апдейта, нахождения кликнутого узла
 			fall: function(node) {
 				if (!node.parent) return;
 				var p = node.parent, i, j;
@@ -339,16 +403,26 @@
 			}
 		}
 		
+		// ф-ии редактора
 		var ed = {
-			run: false,
-			root: Tree2d.root,
-			selected: undefined,
-			images: {},
-			assets: {},
-			selectedAssets: {},
-			selectedAssetsCnt: 0,
-			brush: {timeout:10, ready:true, random:0, grid:0, drag:false, t:0},
+			run: false, // запущена прилага или нет
+			root: Tree2d.root, // корень, может меняться
+			selected: undefined, // выделенный объект
+			images: {}, // хранилище картинок (для избежания дубликатов)
+			assets: {}, // хранилище ассетов (готовые узлы)
+			selectedAssets: {}, // выделенные ассеты
+			selectedAssetsCnt: 0, // их число
+			brush: { // параметры кисти
+				timeout:10, // задержка действия
+				ready:true,
+				grid:0, // высота и ширина сетки
+				random:0, // разброс относительно позиции в сетке
+				drag:false, // тянем?
+				t:0 // таймер, обслуживающий задержку
+			},
 			pickup: false,
+			
+			// грузит картинку, избегает дубликатов
 			loadImage: function(name) {
 				if (ed.images[name]) return ed.images[name];
 				ed.images[name] = new Image;
@@ -356,6 +430,8 @@
 				if (!ed.assets[name]) ed.loadSprite(name);
 				return ed.images[name];
 			},
+			
+			// "вписывает" картинку img в квадрат size*size
 			alignAssetSize: function(img, size) {
 				var d = img.width / img.height;
 				if (img.width > img.height) {
@@ -368,6 +444,8 @@
 					img.hspace = size / 2 - img.width / 2;
 				}
 			},
+			
+			// выделить ассет с именем name
 			selectAsset: function(name) {
 				if (!ed.selectedAssets[name]) {
 					ed.selectedAssets[name] = ed.assets[name];
@@ -380,6 +458,8 @@
 					document.getElementById(name).style.border = "2px solid #f7f4a0";
 				}
 			},
+			
+			// грузит картинку, создает ассет с именем name
 			loadSprite: function(name) {
 				if (ed.assets[name]) return ed.assets[name];
 				
@@ -389,6 +469,8 @@
 				document.getElementById('assets').innerHTML += '<div id="'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white;" onclick="ed.selectAsset(\''+name+'\')" ><img src="'+name+'" ondblclick="ed.placeAsset(\''+name+'\')" onload="ed.alignAssetSize(this, 60)" /></div>';
 				return ed.assets[name];
 			},
+			
+			// создает ассет из строки, содержащей JSON
 			addAssetFromString: function(name, str) {
 				var node = JSON.parse(str);
 				ed.assets[name] = node;
@@ -397,6 +479,8 @@
 				withoutExt = withoutExt.charAt(0).toUpperCase() + withoutExt.substr(1);
 				document.getElementById('assets').innerHTML += '<div id= "'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white; font-size: small; text-align:center;" ondblclick="ed.placeAsset(\''+name+'\')" onclick="ed.selectAsset(\''+name+'\')" ><br />'+withoutExt+'</div>';
 			},
+			
+			// грузит узел из файла, создает соотв. ассет с именем name
 			loadNode: function(name, file) {
 				if (ed.assets[name]) return ed.assets[name];
 				
@@ -408,6 +492,8 @@
 				
 				return ed.assets[name];
 			},
+			
+			// загрузить что-то
 			load: function(evt) {
 				var files = evt.target.files;
 				for (var i = 0, f; f = files[i]; i++) {
@@ -419,6 +505,8 @@
 					}
 				}
 			},
+			
+			// загружает узел, устанавливает его в качестве корня
 			loadProject: function(evt) {
 				var file = evt.target.files[0];
 				var withoutExt = file.name.substr(0, file.name.lastIndexOf('.'));
@@ -439,6 +527,8 @@
 				}
 				var result = reader.readAsText(file);
 			},
+			
+			// выплевывает файл .json, названный как корень, содержащий иерархию сцены в JSON
 			saveProject: function() {
 				var text = JSON.stringify(Tree2d.clean(Tree2d.copy(Tree2d.root)));
 				var pom = document.createElement('a');
@@ -447,6 +537,8 @@
 				pom.setAttribute('type', 'application/json');
 				pom.click();
 			},
+			
+			// обрабатывает нажатие левой кнопки мыши
 			mousePress: function(pos) {
 				if (ed.selectedAssetsCnt == 0) {
 					ed.pickup = true;
@@ -468,6 +560,8 @@
 					ed.brush.t = ed.brush.timeout;
 				}
 			},
+			
+			// перемещение мыши с удержанной левой кнопкой
 			mouseMove: function(pos) {
 				if (ed.pickup && ed.selected.parent) {
 					if (!ed.brush.grid) ed.brush.grid = 1;
@@ -513,10 +607,14 @@
 					ed.brush.t = ed.brush.timeout;
 				}
 			},
+			
+			// отпускание левой кнопки мыши
 			mouseRelease: function(pos) {
 				ed.brush.drag = false;
 				ed.pickup = false;
 			},
+			
+			// нажатие правой кнопки мыши
 			pick: function(pos) {
 				var c = Tree2d.getClickedObject(pos);
 				if (ed.selectedAssetsCnt == 0) {
@@ -526,14 +624,20 @@
 					if (c && c.parent == ed.selected) ed.del(c);
 				}
 			},
+			
+			// "перетаскивание" с нажатой правой кнопкой мыши
 			drag: function(pos) {
 				if (ed.selectedAssetsCnt != 0) {
 					var c = Tree2d.getClickedObject(pos);
 					if (c && c.parent == ed.selected) ed.del(c);
 				}
 			},
+			
+			// отпускание правой кнопки мыши
 			unpick: function() {
 			},
+			
+			// вставляет один из выделенных ассетов в выделенный узел на позиции pos
 			pasteAsset: function(pos) {
 				var c = getRandField(ed.selectedAssets);
 				pos = Tree2d.convertPointToNodeTransform(ed.selected, pos);
@@ -542,33 +646,47 @@
 				Tree2d.add(ed.selected, c);
 				ed.renewHierarhy();
 			},
+			
+			// удаляет узел c из иерархии
 			del: function(c) {
 				if (!c.parent) return;
 				if (c == ed.selected) ed.select(ed.selected.parent.id);
 				Tree2d.del(c);
 				ed.renewHierarhy();
 			},
+			
+			// устанавливает размер сетки input.value
 			setGrid: function(input) {
 				ed.brush.grid = parseFloat(input.value);
 				input.title = ed.brush.grid;
 			},
-			setBrushRandom: function(input) {
-				ed.brush.random = parseFloat(input.value);
-				input.title = ed.brush.random;
-			},
+			
+			// устанавливает задержку кисти input.value
 			setBrushDelay: function(input) {
 				ed.brush.timeout = parseFloat(input.value);
 				input.title = ed.brush.timeout;
 			},
+			
+			// устанавливает разброс кисти input.value
+			setBrushRandom: function(input) {
+				ed.brush.random = parseFloat(input.value);
+				input.title = ed.brush.random;
+			},
+			
+			// поднимает выделенную ноду наверх (вниз по иерархии)
 			raise: function() {
 				Tree2d.fall(ed.selected);
 				ed.renewHierarhy();
 				ed.select(ed.selected.id);
 			},
+			
+			// опускает выделенную ноду на слой ниже (вверх по иерархии)
 			fall: function(node) {
 				Tree2d.raise(ed.selected);
 				ed.renewHierarhy();
 			},
+			
+			// обновляет выпадающий список иерархии
 			renewHierarhy: function() {
 				var n = Tree2d.root, str = '', t = -1;
 				
@@ -602,6 +720,7 @@
 				document.getElementById('hierarhy').value = ed.selected.id;
 			},
 			
+			// выделяет ноду с ID = id
 			select: function(id) {
 				id = parseFloat(id);
 				ed.selected = Tree2d.findById(id);
@@ -609,6 +728,7 @@
 				ed.updateInfo();
 			},
 			
+			// устанавливает параметр param выделенной ноды равным value
 			set: function(param, value) {
 				var node = ed.selected;
 				if (typeof(value) === 'boolean') {
@@ -629,6 +749,7 @@
 				if (param == 'name') ed.renewHierarhy();
 			},
 			
+			// обновляет блок информации о ноде
 			updateInfo: function() {
 				var node = ed.selected;
 				var excluded = ['id', 'src', 'class'];
@@ -664,12 +785,14 @@
 				document.getElementById('info').innerHTML = str;
 			},
 			
+			// вставляет ассет с именем name в выделенную ноду на позиции (0, 0)
 			placeAsset: function(name) {
 				var c = Tree2d.add(ed.selected, ed.assets[name]);
 				ed.select(c.id);
 				ed.renewHierarhy();
 			},
 			
+			// действия за кадр: отрисовка и мб обработка
 			cycle: function() {
 				var n = ed.root;
 				ctx.save();
@@ -726,6 +849,7 @@
 				ctx.restore();
 			},
 			
+			// переключает состояние редактора из "редактирование" в "просмотр" и обратно
 			runGame: function(btn) {
 				if (!ed.run) {
 					ed.root = Tree2d.copy(Tree2d.root);
@@ -740,6 +864,7 @@
 			}
 		};
 		
+		// выбрать случайный объект из объекта obj
 		function getRandField(obj) {
 			var size = 0;
 			for (i in obj) if (typeof obj == 'object') {
@@ -752,6 +877,7 @@
 			}
 		}
 		
+		// получить позицию мыши внутри canvas
 		function getMousePos(canvas, evt) {
 			var rect = canvas.getBoundingClientRect();
 			return {
@@ -760,6 +886,8 @@
 			};
 		}
 		
+		// определяет, лежит ли точка (x, y) в полигоне с иксами вершин в xp и игреками в yp,
+		// с количеством вершин npol
 		function pnpoly(npol, xp, yp, x, y) {
 			var i, j, c = false;
 			for (i = 0, j = npol-1; i < npol; j = i++) {
@@ -771,6 +899,7 @@
 			return c;
 		}
 		
+		// инициализирует узел - спрайт
 		function Sprite(node) {
 			node.img = ed.loadImage(node.src);
 			if (!node.width) node.width = node.img.width;
@@ -779,20 +908,5 @@
 				ctx.drawImage(node.img, -node.width / 2, -node.height / 2);
 			}
 		}
-		
-		canvas = document.getElementById("myCanvas");
-		canvas.addEventListener('mousedown', function(evt) {if (evt.button == 0) ed.mousePress(getMousePos(canvas, evt)); else ed.pick(getMousePos(canvas, evt));}, false);
-		canvas.addEventListener('mousemove', function(evt) {if (evt.button == 0) ed.mouseMove(getMousePos(canvas, evt)); else ed.drag(getMousePos(canvas, evt));}, false);
-		canvas.addEventListener('mouseup',   function(evt) {if (evt.button == 0) ed.mouseRelease(getMousePos(canvas, evt)); else ed.unpick();}, false);
-		canvas.addEventListener('mouseout',   function(evt) {if (evt.button == 0) ed.mouseRelease(0); else ed.unpick();}, false);
-		ctx = canvas.getContext("2d");
-		document.getElementById('files').addEventListener('change', ed.load, false);
-		document.getElementById('projectLoader').addEventListener('change', ed.loadProject, false);
-		ctx.strokeStyle = 'red';
-		ctx.lineWidth = 2;
-		ed.select(0);
-		ed.renewHierarhy();
-		ed.addAssetFromString('node.json', '{"class":"Node"}');
-		setInterval(ed.cycle, 10);
 	}</script>
 </html>
