@@ -77,7 +77,7 @@
 			copy: function(node) {
 				var copy = {};
 				for (i in node) {
-					if (typeof node[i] === 'function' || typeof node[i] === 'object' || i == 'id') {
+					if (typeof node[i] === 'object' || i == 'id') {
 					} else {
 						copy[i] = node[i];
 					}
@@ -206,6 +206,51 @@
 					if (c != node) c.a = 0;
 					else if (c.a == 0) c.a = 1;
 					c = c.next;
+				}
+			},
+			
+			cookUpdate: function(node) {
+				if (!node.e) return;
+				
+				var str = '(function(n) {\n', cnt = 0;
+				for (i in node.e) {
+					if (i == 'init') continue;
+					var line = node.e[i];
+					line = line.split(';').join('\n');
+					for (j in node) {
+						if (typeof node[j] == 'number') {
+							line = line.split(j).join('n.'+j);
+						}
+					}
+					for (j in Tree2d) {
+						line = line.split(j).join('Tree2d.'+j);
+					}
+					str += line;
+					cnt++;
+				}
+				str += '\n})';
+				
+				if (cnt > 0) {
+					console.log('update: ' + str);
+					node.update = eval(str);
+				}
+				
+				if (node.e.init) {
+					var str = '(function(n) {\n';
+					var line = node.e.init;
+					line = line.split(';').join('\n');
+					for (j in node) {
+						if (typeof node[j] == 'number') {
+							line = line.split(j).join('n.'+j);
+						}
+					}
+					for (j in Tree2d) {
+						line = line.split(j).join('Tree2d.'+j);
+					}
+					str += line + '\n})';
+					
+					console.log('init: ' + str);
+					node.init = eval(str);
 				}
 			},
 			
@@ -759,33 +804,35 @@
 				var node = ed.selected;
 				var excluded = ['id', 'src', 'class'];
 				var str = '\
-				<input type="text" value="Name" readonly /><input type="text" onclick="this.select()" onchange="ed.set(\'name\',this.value)" id="edit-name" value="'+(node.name?node.name:'')+'" /><br />\
-				<input type="text" value="Position" readonly /><input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'x\',this.value)" id="edit-x" value="'+node.x+'" />\
+				<input type="text" value="Name" readonly style="width:80px" /><input type="text" onclick="this.select()" onchange="ed.set(\'name\',this.value)" id="edit-name" value="'+(node.name?node.name:'')+'" /><br />\
+				<input type="text" value="Position" readonly style="width:80px" /><input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'x\',this.value)" id="edit-x" value="'+node.x+'" />\
 				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'y\',this.value)" id="edit-y" value="'+node.y+'" /><br />\
-				<input type="text" value="Scale" readonly /><input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'zx\',this.value)" id="edit-zx" value="'+node.zx+'" />\
+				<input type="text" value="Scale" readonly style="width:80px" /><input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'zx\',this.value)" id="edit-zx" value="'+node.zx+'" />\
 				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'zy\',this.value)" id="edit-zy" value="'+node.zy+'" /><br />\
-				<input type="text" value="Bounds" readonly /><input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'w\',this.value)" id="edit-w" value="'+node.w+'" />\
+				<input type="text" value="Bounds" readonly style="width:80px" /><input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'w\',this.value)" id="edit-w" value="'+node.w+'" />\
 				<input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'h\',this.value)" id="edit-h" value="'+node.h+'" /><br />\
-				<input type="text" value="Rotation" readonly /><input type="number" onclick="this.select()" onchange="ed.set(\'r\',this.value)" id="edit-r" value="'+node.r+'" /><br />\
-				<input type="text" value="Opacity" readonly /><input type="range" onchange="ed.set(\'a\',this.value)" id="edit-a" min="0" max="1" step="0.05" value="'+node.a+'" />\
+				<input type="text" value="Rotation" readonly style="width:80px" /><input type="number" onclick="this.select()" onchange="ed.set(\'r\',this.value)" id="edit-r" value="'+node.r+'" /><br />\
+				<input type="text" value="Opacity" readonly style="width:80px" /><input type="range" onchange="ed.set(\'a\',this.value)" id="edit-a" min="0" max="1" step="0.05" value="'+node.a+'" />\
 				<input type="checkbox" onclick="this.select()" onchange="ed.set(\'a\',this.checked)" id="edit-a-checkbox" '+(node.a>0?"checked":"")+' /><br />';
 				
 				str += 'Other attributes:<br /><table>';
 				for (i in node) {
-					var flag = '';
-					for (j in excluded) if (i == excluded[j]) flag = 'readonly';
+					var flag = false;
+					for (j in excluded) if (i == excluded[j]) flag = true;
+					if (flag) continue;
 					if (i == 'x' || i == 'y' || i == 'r' || i == 'zx' || i == 'zy' || i == 'a' || i == 'w' || i == 'h') {
 					} else if (typeof node[i] == 'number' && i != 'id') {
 						var name = i;
-						str += '<tr><td><input type="text" value="'+name+'" readonly /></td><td><input '+flag+' type="number" onclick="this.select()" onchange="ed.set(\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /></td><td><input type="button" value="-" onclick="ed.deleteAttr(\''+name+'\')"></td></tr>';
+						str += '<tr><td><input type="text" value="'+name+'" readonly style="width:80px" /></td><td><input type="number" onclick="this.select()" onchange="ed.set(\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /></td><td><input type="button" value="-" onclick="ed.deleteAttr(\''+name+'\')"></td></tr>';
 					}
 				}
 				for (i in node) {
-					var flag = '';
-					for (j in excluded) if (i == excluded[j]) flag = 'readonly';
+					var flag = false;
+					for (j in excluded) if (i == excluded[j]) flag = true;
+					if (flag) continue;
 					if (typeof node[i] == 'string' && i != 'name') {
 						var name = i;
-						str += '<tr><td>'+name+'</td><td><input '+flag+' type="text" onclick="this.select()" onchange="ed.set(\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /></td></tr>';
+						str += '<tr><td>'+name+'</td><td><input type="text" onclick="this.select()" onchange="ed.set(\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /></td></tr>';
 					}
 				}
 				str += '</table><input id="addAttributeName" type="text" placeholder="key" onkeydown="ed.trySubmit(event, \'addAttrBtn\')" /><input id="addAttrBtn" type="button" value="Add" onclick="ed.addAttribute()" /><br />';
@@ -794,7 +841,7 @@
 				excluded = [];
 				if (node.e) {
 					for (i in node.e) {
-						str += '<tr><td><input type="text" value="'+i+'" readonly style="width:80px" /></td><td><input type="text" onclick="this.select()" value='+node.e[i]+' /></td><td><input type="button" value="-" onclick="ed.deleteEvent(\''+i+'\')"></td></tr>';
+						str += '<tr><td><input type="text" value="'+i+'" readonly style="width:80px" /></td><td><input type="text" onclick="this.select()" onchange="ed.setEvent(\''+i+'\', this.value)" value='+node.e[i]+' /></td><td><input type="button" value="-" onclick="ed.deleteEvent(\''+i+'\')"></td></tr>';
 						excluded.push(i);
 					}
 				}
@@ -811,6 +858,13 @@
 				str += '</select><input type="button" value="Add" onclick="ed.addEvent()" />';
 				
 				document.getElementById('info').innerHTML = str;
+				
+				Tree2d.cookUpdate(node);
+			},
+			
+			setEvent: function(name, val) {
+				ed.selected.e[name] = val;
+				Tree2d.cookUpdate(ed.selected);
 			},
 			
 			deleteEvent: function(name) {
@@ -923,6 +977,7 @@
 					btn.value = 'Run';
 				}
 				ed.run = !ed.run;
+				console.log(ed.root);
 			}
 		};
 		
