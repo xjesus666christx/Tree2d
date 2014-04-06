@@ -212,35 +212,49 @@
 			
 			// подготавливает ф-ии update и init из ивентов узла
 			cookUpdate: function(node) {
+				var regex = /^[\.,-\/#!$%\^&\*;:{}=\-_`~()0123456789]+$/;
 				if (!node.e) return;
 				var str = '(function(n) {\n', cnt = 0;
 				for (i in node.e) {
 					if (i == 'init') continue;
+					if (i == 'box collision') str += '\nif (Tree2d.boxCollision(n)) {\n';
 					var line = node.e[i];
-					line = line.split(';').join('\n');
-					for (j in node) {
-						if (typeof node[j] == 'number') {
-							line = line.split(j).join('n.'+j);
-							line
+					line = line.split('\n').join(';');
+					var arr = line.split(/\b/);
+					for (k in arr) {
+						for (j in node) {
+							if (arr[k] == j) {
+								arr[k] = 'n.' + arr[k];
+							}
+						}
+						for (j in Tree2d) {
+							if (arr[k] == j) {
+								arr[k] = 'Tree2d.' + arr[k];
+							}
+						}
+						var f;
+						try {
+							f = eval(arr[k]);
+						} catch (e) {}
+						if (typeof f == 'function') {
+							arr[k] += '(n)';
 						}
 					}
-					for (j in Tree2d) {
-						line = line.split(j).join('Tree2d.'+j);
-					}
+					line = arr.join('').split(';').join('\n');
 					str += line;
+					if (i == 'box collision') str += '\n}';
 					cnt++;
 				}
 				str += '\n})';
+				console.log(str);
 				
 				if (cnt > 0) node.update = eval(str);
 				
 				if (node.e.init) {
-					var regex = /^[\.,-\/#!$%\^&\*;:{}=\-_`~()0123456789]+$/;
 					var str = '(function(n) {\n';
 					var line = node.e.init;
 					line = line.split('\n').join(';');
 					var arr = line.split(/\b/);
-					console.log(arr);
 					for (i in arr) {
 						for (j in node) {
 							if (arr[i] == j) {
@@ -262,7 +276,6 @@
 					}
 					line = arr.join('').split(';').join('\n');
 					str += line + '\n})';
-					console.log(str);
 					
 					node.init = eval(str);
 				}
@@ -465,6 +478,29 @@
 						prev = val;
 					}
 				}
+			},
+			
+			boxCollision: function(n) {
+				var c = n.parent.child;
+				while (c) {
+					if (c != n) {
+						var dx = Math.abs(c.x - n.x);
+						var dy = Math.abs(c.y - n.y);
+						var dw = (c.w + n.w) * 0.5;
+						var dh = (c.h + n.h) * 0.5;
+						if (dx < dw && dy < dh) {
+							if (dx < dy) {
+								if (n.x < c.x) n.x = c.x - dw;
+								else n.x = c.x + dw;
+							} else {
+								if (n.y < c.y) n.y = c.y - dh;
+								else n.y = c.y + dh;
+							}
+							return true;
+						}
+					}
+					c = c.next;
+				}
 			}
 		}
 		
@@ -477,7 +513,7 @@
 			assets: {}, // хранилище ассетов (готовые узлы)
 			selectedAssets: {}, // выделенные ассеты
 			selectedAssetsCnt: 0, // их число
-			eventTypes: ['update', 'click', 'init', 'destroy'], // типы возможных событий
+			eventTypes: ['update', 'click', 'init', 'box collision'], // типы возможных событий
 			brush: { // параметры кисти
 				timeout:10, // задержка действия
 				ready:true,
