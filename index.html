@@ -13,9 +13,10 @@
 			<input type="button" value="Run" onclick="ed.runGame(this)" style="width:32%" />
 			<select id="hierarhy" style="width:100%" onchange="ed.select(this.value)"></select>
 			<div id="info" style="width:100%;height:40%;overflow:scroll"></div>
-			<input type="button" value="Raise"  onclick="ed.raise()" style="width:32%" />
-			<input type="button" value="Fall" onclick="ed.fall()" style="width:32%" />
-			<input type="button" value="Delete" onclick="ed.del(ed.selected)" style="width:32%" />
+			<input type="button" value="Raise"  onclick="ed.raise()" style="width:23%" />
+			<input type="button" value="Fall" onclick="ed.fall()" style="width:23%" />
+			<input type="button" value="To asset" onclick="ed.assetFromNode(ed.selected)" style="width:23%" />
+			<input type="button" value="Delete" onclick="ed.del(ed.selected)" style="width:23%" />
 			<input type="range" min="0" max="100" step="5" value="0" onchange="ed.setGrid(this)" /> Grid<br />
 			<input type="range" min="0" max="20" value="0" onchange="ed.setBrushRandom(this)" /> Brush random<br />
 			<input type="range" min="0" max="30" step="2" value="10" onchange="ed.setBrushDelay(this)" /> Brush delay<br />
@@ -31,10 +32,10 @@
 		
 		onload = function() {
 			canvas = document.getElementById("myCanvas");
-			canvas.addEventListener('mousedown', function(evt) {if (evt.button == 0) ed.mousePress(getMousePos(canvas, evt)); else ed.pick(getMousePos(canvas, evt));}, false);
-			canvas.addEventListener('mousemove', function(evt) {if (evt.button == 0) ed.mouseMove(getMousePos(canvas, evt)); else ed.drag(getMousePos(canvas, evt));}, false);
-			canvas.addEventListener('mouseup',   function(evt) {if (evt.button == 0) ed.mouseRelease(getMousePos(canvas, evt)); else ed.unpick();}, false);
-			canvas.addEventListener('mouseout',   function(evt) {if (evt.button == 0) ed.mouseRelease(0); else ed.unpick();}, false);
+			canvas.addEventListener('mousedown', function(evt) {if (ed.run) {Tree2d.mousedown=getMousePos(canvas, evt)} else {if (evt.button == 0) ed.mousePress(getMousePos(canvas, evt)); else ed.pick(getMousePos(canvas, evt));}}, false);
+			canvas.addEventListener('mousemove', function(evt) {if (ed.run) {Tree2d.mousemove=getMousePos(canvas, evt)} else {if (evt.button == 0) ed.mouseMove(getMousePos(canvas, evt)); else ed.drag(getMousePos(canvas, evt));}}, false);
+			canvas.addEventListener('mouseup',   function(evt) {if (ed.run) {Tree2d.mouseup=getMousePos(canvas, evt)} else {if (evt.button == 0) ed.mouseRelease(getMousePos(canvas, evt)); else ed.unpick();}}, false);
+			canvas.addEventListener('mouseout',   function(evt) {if (ed.run) {Tree2d.mouseup=getMousePos(canvas, evt)} else {if (evt.button == 0) ed.mouseRelease(0); else ed.unpick();}}, false);
 			ctx = canvas.getContext("2d");
 			document.getElementById('files').addEventListener('change', ed.load, false);
 			document.getElementById('projectLoader').addEventListener('change', ed.loadProject, false);
@@ -42,7 +43,7 @@
 			ctx.lineWidth = 2;
 			ed.select(0);
 			ed.renewHierarhy();
-			ed.addAssetFromString('node.json', '{"e":{"init":"layer"}}');
+			ed.addAssetFromString('node.json', '{}');
 			setInterval(ed.cycle, 10);
 		}
 		
@@ -65,12 +66,15 @@
 				name:'root' // имя узла (по нему тоже можно искать узел в дереве)
 			},
 			
+			mousedown: {},
+			mousemove: {},
+			mouseup: {},
+			cameraobj: {},
+			
 			cid: 1, // текущий айдишник
 			
 			// генерирует уникальный айдишник - имя узла
-			genId: function() {
-				return Tree2d.cid++;
-			},
+			genId: function() {return Tree2d.cid++;},
 			
 			// возвращает копию указанного узла
 			// рекурсивная
@@ -87,10 +91,10 @@
 						copy[i] = node[i];
 					}
 				}
-				if (node && node.c) {
+				if (node.c) {
 					copy.c = [];
 					for (i in node.c) {
-						if (node.c[i]) copy.c[i] = Tree2d.copy(node.c[i]);
+						if (node.c[i] && node.c[i] != null) copy.c[i] = Tree2d.copy(node.c[i]);
 					}
 				}
 				return copy;
@@ -145,13 +149,13 @@
 				for (i in node) {
 					if (typeof node[i] === 'number') {
 						node[i] = parseFloat(node[i].toFixed(4));
-					} else if (i != 'c' && typeof node[i] === 'object') {
+					} else if (i != 'c' && i != 'e' && typeof node[i] === 'object') {
 						node[i] = 0;
 						delete node[i];
 					}
 				}
 				for (i in node.c) {
-					if (node.c[i]) Tree2d.clean(node.c[i]);
+					if (node.c[i] && node.c[i] != null) Tree2d.clean(node.c[i]);
 					else delete node.c[i];
 				}
 				return node;
@@ -187,7 +191,6 @@
 						if (parent.c[i] == node) {
 							parent.c[i] = 0;
 							delete parent.c[i];
-							break;
 						}
 					}
 					if (parent.child == node) {
@@ -210,83 +213,100 @@
 				}
 			},
 			
+			// берет строку ивента line (то поле, которое после типа ивента), и делает из нее код на JS
+			// автоматом преобразует 'param' в 'n.param', если в node есть поле param
+			// дополняет 'Tree2d.' к ф-ям Tree2d
+			// заменяет '_nodename.x' на 'Tree2d.findNodeByName("nodename").x'
+			makeFunction: function(node, line) {
+				var alphanumetric = /^[a-z][a-z0-9]+$/i;
+				var numetric = /^[0-9]+$/;
+				var noan = /^\W$/;
+				line = line.split('\n').join(';');
+				
+				var arr = line.split(/\b/), f;
+				for (k in arr) {
+					if (arr[k].charAt(0) == '_') {
+						arr[k] = 'Tree2d.findByName("'+arr[k].substr(1)+'")';
+						continue;
+					}
+					
+					var prev = arr[parseFloat(k)-1];
+					if (prev && prev == '.') continue;
+					
+					var flag = false;
+					
+					for (j in node) {
+						if (arr[k] == j) {
+							arr[k] = 'n.' + arr[k];
+							flag = true;
+						}
+					}
+					for (j in Tree2d) {
+						if (arr[k] == j) {
+							arr[k] = 'Tree2d.' + arr[k];
+							flag = true;
+						}
+					}
+					
+					try {
+						f = eval(arr[k]);
+					} catch (e) {}
+					if (typeof f == 'function') {
+						arr[k] += '(n)';
+						flag = true;
+					}
+					
+					if (alphanumetric.test(arr[k]) && !flag) {
+						alert ('Unknown identifier "'+arr[k]+'" at line "'+line+'"');
+						return '';
+					}
+				}
+				line = arr.join('').split(';').join('\n');
+				
+				try {
+					eval('(function(n){'+line+'})');
+				} catch (e) {
+					alert('Error in "'+line+'": ' + e);
+					line = '';
+				}
+				
+				return line;
+			},
+			
 			// подготавливает ф-ии update и init из ивентов узла
 			cookUpdate: function(node) {
-				var regex = /^[\.,-\/#!$%\^&\*;:{}=\-_`~()0123456789]+$/;
 				if (!node.e) return;
 				var str = '(function(n) {\n', cnt = 0;
 				for (i in node.e) {
 					if (i == 'init') continue;
 					if (i == 'box collision') str += '\nif (Tree2d.boxCollision(n)) {\n';
-					var line = node.e[i];
-					line = line.split('\n').join(';');
-					var arr = line.split(/\b/);
-					for (k in arr) {
-						for (j in node) {
-							if (arr[k] == j) {
-								arr[k] = 'n.' + arr[k];
-							}
-						}
-						for (j in Tree2d) {
-							if (arr[k] == j) {
-								arr[k] = 'Tree2d.' + arr[k];
-							}
-						}
-						var f;
-						try {
-							f = eval(arr[k]);
-						} catch (e) {}
-						if (typeof f == 'function') {
-							arr[k] += '(n)';
-						}
-					}
-					line = arr.join('').split(';').join('\n');
-					str += line;
-					if (i == 'box collision') str += '\n}';
+					if (i == 'click') str += '\nif (Tree2d.mousedown && Tree2d.getClickedObject({x:Tree2d.mousedown.x-Tree2d.cameraobj.x,y:Tree2d.mousedown.y-Tree2d.cameraobj.y}) == n) {\n';
+					str += Tree2d.makeFunction(node, node.e[i]);
+					if (i == 'click' || i == 'box collision') str += '\n}';
 					cnt++;
 				}
 				str += '\n})';
-				console.log(str);
 				
 				if (cnt > 0) node.update = eval(str);
 				
 				if (node.e.init) {
 					var str = '(function(n) {\n';
-					var line = node.e.init;
-					line = line.split('\n').join(';');
-					var arr = line.split(/\b/);
-					for (i in arr) {
-						for (j in node) {
-							if (arr[i] == j) {
-								arr[i] = 'n.' + arr[i];
-							}
-						}
-						for (j in Tree2d) {
-							if (arr[i] == j) {
-								arr[i] = 'Tree2d.' + arr[i];
-							}
-						}
-						if (!regex.test(arr[i])) {
-							if (arr[parseFloat(i)+1] && arr[parseFloat(i)+1] == ';') {
-								arr[i] += '(n)';
-							} else if (!arr[parseFloat(i)+1]) {
-								arr[i] += '(n);';
-							}
-						}
-					}
-					line = arr.join('').split(';').join('\n');
-					str += line + '\n})';
+					str += Tree2d.makeFunction(node, node.e.init);
+					str += '\n})';
 					
 					node.init = eval(str);
 				}
+				
+				return true;
 			},
 			
 			// действия за 1 кадр: отрисовка и апдейт
 			cycle: function() {
+				var t = Tree2d.getScreenTransform(Tree2d.cameraobj);
 				var n = Tree2d.root;
 				ctx.save();
 				ctx.fillRect(0, 0, canvas.width, canvas.height);
-				ctx.translate(canvas.width / 2, canvas.height / 2);
+				ctx.translate(canvas.width / 2 - t.x, canvas.height / 2 - t.y);
 				while (n) {
 					ctx.save();
 					ctx.globalAlpha *= n.a;
@@ -302,7 +322,6 @@
 						n = n.child;
 					} else {
 						while (n) {
-							ctx.globalAlpha /= n.a;
 							ctx.restore();
 							if (n.next) {
 								n = n.next;
@@ -313,6 +332,10 @@
 					}
 				}
 				ctx.restore();
+				
+				Tree2d.mousedown = undefined;
+				Tree2d.mousemove = undefined;
+				Tree2d.mouseup = undefined;
 			},
 			
 			// если узел с ID id не найден - вернет undefined
@@ -402,6 +425,29 @@
 				return {x:x / t.zx, y:-y / t.zy};
 			},
 			
+			// кликнут ли объект n, при клике в позиции pos
+			isObjectClicked: function(n, pos) {
+				var t = Tree2d.getScreenTransform(n);
+				var si = Math.sin(t.r * Math.PI / 180);
+				var co = Math.cos(t.r * Math.PI / 180);
+				var xp = [];
+				var yp = [];
+				var w = n.w / 2, h = n.w / 2;
+				xp.push(t.x + t.zx * w * co - t.zy * h * si);
+				yp.push(t.y + t.zx * w * si + t.zy * h * co);
+				w = -w;
+				xp.push(t.x + t.zx * w * co - t.zy * h * si);
+				yp.push(t.y + t.zx * w * si + t.zy * h * co);
+				h = -h;
+				xp.push(t.x + t.zx * w * co - t.zy * h * si);
+				yp.push(t.y + t.zx * w * si + t.zy * h * co);
+				w = -w;
+				xp.push(t.x + t.zx * w * co - t.zy * h * si);
+				yp.push(t.y + t.zx * w * si + t.zy * h * co);
+				
+				if (pnpoly(4, xp, yp, pos.x, pos.y)) return true;
+			},
+			
 			// тут все просто: находит кликнутый объект
 			// если такого нет - возвращает undefined
 			getClickedObject: function(pos) {
@@ -425,26 +471,9 @@
 				
 				arr = arr.reverse();
 				for (i in arr) {
-					n = arr[i];
-					var t = Tree2d.getScreenTransform(n);
-					var si = Math.sin(t.r * Math.PI / 180);
-					var co = Math.cos(t.r * Math.PI / 180);
-					var xp = [];
-					var yp = [];
-					var w = n.w / 2, h = n.w / 2;
-					xp.push(t.x + t.zx * w * co - t.zy * h * si);
-					yp.push(t.y + t.zx * w * si + t.zy * h * co);
-					w = -w;
-					xp.push(t.x + t.zx * w * co - t.zy * h * si);
-					yp.push(t.y + t.zx * w * si + t.zy * h * co);
-					h = -h;
-					xp.push(t.x + t.zx * w * co - t.zy * h * si);
-					yp.push(t.y + t.zx * w * si + t.zy * h * co);
-					w = -w;
-					xp.push(t.x + t.zx * w * co - t.zy * h * si);
-					yp.push(t.y + t.zx * w * si + t.zy * h * co);
-					
-					if (pnpoly(4, xp, yp, pos.x, pos.y)) return n;
+					if (Tree2d.isObjectClicked(arr[i], pos)) {
+						return arr[i];
+					}
 				}
 			},
 			
@@ -480,6 +509,7 @@
 				}
 			},
 			
+			// проверяет AABB столкновения для объекта n среди его соседей, попутно их решает
 			boxCollision: function(n) {
 				var c = n.parent.child;
 				while (c) {
@@ -489,7 +519,7 @@
 						var dw = (c.w + n.w) * 0.5;
 						var dh = (c.h + n.h) * 0.5;
 						if (dx < dw && dy < dh) {
-							if (dx < dy) {
+							if (dx > dy) {
 								if (n.x < c.x) n.x = c.x - dw;
 								else n.x = c.x + dw;
 							} else {
@@ -501,6 +531,11 @@
 					}
 					c = c.next;
 				}
+			},
+			
+			//
+			camera: function(node) {
+				Tree2d.cameraobj = node;
 			}
 		}
 		
@@ -579,6 +614,15 @@
 				
 				var withoutExt = name.substr(0, name.lastIndexOf('.'));
 				withoutExt = withoutExt.charAt(0).toUpperCase() + withoutExt.substr(1);
+				document.getElementById('assets').innerHTML += '<div id= "'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white; font-size: small; text-align:center;" ondblclick="ed.placeAsset(\''+name+'\')" onclick="ed.selectAsset(\''+name+'\')" ><br />'+withoutExt+'</div>';
+			},
+			
+			assetFromNode: function(node) {
+				var name = node.name || 'asset' + node.id;
+				if (ed.assets[name]) return ed.assets[name];
+				ed.assets[name] = node;
+				
+				withoutExt = name.charAt(0).toUpperCase() + name.substr(1);
 				document.getElementById('assets').innerHTML += '<div id= "'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white; font-size: small; text-align:center;" ondblclick="ed.placeAsset(\''+name+'\')" onclick="ed.selectAsset(\''+name+'\')" ><br />'+withoutExt+'</div>';
 			},
 			
@@ -865,7 +909,7 @@
 				<input type="text" value="Opacity" readonly style="width:80px" /><input type="range" onchange="ed.set(\'a\',this.value)" id="edit-a" min="0" max="1" step="0.05" value="'+node.a+'" />\
 				<input type="checkbox" onclick="this.select()" onchange="ed.set(\'a\',this.checked)" id="edit-a-checkbox" '+(node.a>0?"checked":"")+' /><br />';
 				
-				str += 'Other attributes:<br /><table>';
+				str += '<table>';
 				for (i in node) {
 					var flag = false;
 					for (j in excluded) if (i == excluded[j]) flag = true;
@@ -895,33 +939,44 @@
 						excluded.push(i);
 					}
 				}
-				str += '</table><select id="addEventType">'
+				str += '</table>';
+				
+				var tmpstr = '';
 				for (i in ed.eventTypes) {
 					var name = ed.eventTypes[i];
 					var flag = true;
 					for (j in excluded) {
-						if (name == excluded[j]) flag = false;
+						if (name == excluded[j]) {
+							flag = false;
+						}
 					}
 					if (!flag) continue;
-					str += '<option value="'+name+'">'+name+'</option>';
+					tmpstr += '<option value="'+name+'">'+name+'</option>';
 				}
-				str += '</select><input type="button" value="Add" onclick="ed.addEvent()" />';
+				if (tmpstr && tmpstr != '') {
+					str += '<select id="addEventType">';
+					str += tmpstr;
+					str += '</select><input type="button" value="Add" onclick="ed.addEvent()" />';
+				}
 				
 				document.getElementById('info').innerHTML = str;
 				
 				Tree2d.cookUpdate(node);
 			},
 			
+			// устанавливает выделеной ноде обработчик ивента, заодно компилит его и проверяет
 			setEvent: function(name, val) {
 				ed.selected.e[name] = val;
 				Tree2d.cookUpdate(ed.selected);
 			},
 			
+			// удаляет из выделенной ноды ивент
 			deleteEvent: function(name) {
 				delete ed.selected.e[name];
 				ed.updateInfo();
 			},
 			
+			// добавляет в выделенную ноду ивент с пустым обработчиком
 			addEvent: function() {
 				var name = document.getElementById('addEventType').value;
 				if (!ed.selected.e) ed.selected.e = {};
@@ -929,17 +984,20 @@
 				ed.updateInfo();
 			},
 			
+			// удаляет из выделенной ноды поле с именем name
 			deleteAttr: function(name) {
 				delete ed.selected[name];
 				ed.updateInfo();
 			},
 			
+			// обрабатывает нажатие Enter в поле ввода
 			trySubmit: function(event, id) {
 				if (event.keyCode == 13) {
 					document.getElementById(id).click();
 				}
 			},
 			
+			// добавляет в выделенную ноду поле
 			addAttribute: function() {
 				var name = document.getElementById('addAttributeName').value;
 				var excluded = ['x', 'y', 'r', 'w', 'h', 'zx', 'zy', 'a', 'src', 'id', 'class', 'update', 'draw', 'init'];
@@ -962,15 +1020,19 @@
 			
 			// действия за кадр: отрисовка и мб обработка
 			cycle: function() {
-				var n = ed.root;
+				var t = Tree2d.getScreenTransform(Tree2d.cameraobj);
+				var n = Tree2d.root;
 				ctx.save();
+				ctx.strokeStyle = 'red';
 				ctx.fillRect(0, 0, canvas.width, canvas.height);
-				ctx.translate(canvas.width / 2, canvas.height / 2);
+				if (ed.run) ctx.translate(canvas.width / 2 - t.x, canvas.height / 2 - t.y);
+				else ctx.translate(canvas.width / 2, canvas.height / 2);
 				while (n) {
 					ctx.save();
 					ctx.translate(n.x, n.y);
 					ctx.rotate(n.r / 180 * Math.PI);
 					ctx.scale(n.zx, n.zy);
+					ctx.globalAlpha *= n.a;
 					if (n.a) {
 						if (ed.run && n.update) n.update(n);
 						if (n.debugDraw) n.debugDraw(n);
@@ -1013,21 +1075,25 @@
 					}
 				}
 				ctx.restore();
+				
+				Tree2d.mousedown = undefined;
+				Tree2d.mousemove = undefined;
+				Tree2d.mouseup = undefined;
 			},
 			
 			// переключает состояние редактора из "редактирование" в "просмотр" и обратно
 			runGame: function(btn) {
 				if (!ed.run) {
-					ed.root = Tree2d.copy(Tree2d.root);
-					Tree2d.init(ed.root);
+					Tree2d.root = Tree2d.copy(ed.root);
+					Tree2d.init(Tree2d.root);
 					btn.value = 'Stop';
 				} else {
-					delete ed.root;
-					ed.root = Tree2d.root;
+					delete Tree2d.root;
+					Tree2d.root = ed.root;
 					btn.value = 'Run';
 				}
 				ed.run = !ed.run;
-				console.log(ed.root);
+				console.log(Tree2d.root);
 			}
 		};
 		
@@ -1072,7 +1138,7 @@
 			if (!node.w) node.w = node.img.width;
 			if (!node.h) node.h = node.img.height;
 			node.draw = function(node) {
-				ctx.drawImage(node.img, -node.w / 2, -node.h / 2);
+				ctx.drawImage(node.img, -node.img.width / 2, -node.img.height / 2);
 			}
 		}
 	}</script>
