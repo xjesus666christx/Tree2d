@@ -80,7 +80,7 @@
 			// рекурсивная
 			copy: function(node) {
 				var copy = {};
-				for (i in node) {
+				for (var i in node) {
 					if (i == 'e') {
 						copy.e = {};
 						for (j in node.e) {
@@ -93,7 +93,7 @@
 				}
 				if (node.c) {
 					copy.c = [];
-					for (i in node.c) {
+					for (var i in node.c) {
 						if (node.c[i] && node.c[i] != null) copy.c[i] = Tree2d.copy(node.c[i]);
 					}
 				}
@@ -118,7 +118,7 @@
 				if (node.init) node.init(node);
 				if (node.c) {
 					var prev;
-					for (i in node.c) {
+					for (var i in node.c) {
 						var val = node.c[i];
 						if (!val) console.log(node);
 						if (!val.parent) val.parent = node;
@@ -135,18 +135,18 @@
 			// рекурсивная
 			clean: function(node) {
 				if (node.x == 0) delete node.x;
-				else node.x = Math.floor(node.x);
+				else node.x = Math.round(node.x);
 				if (node.y == 0) delete node.y;
-				else node.y = Math.floor(node.y);
+				else node.y = Math.round(node.y);
 				if (node.r == 0) delete node.r;
-				else node.r = Math.floor(node.r);
+				else node.r = Math.round(node.r);
 				if (node.zx == 1) delete node.zx;
 				if (node.zy == 1) delete node.zy;
 				if (node.a == 1) delete node.a;
 				if (node.w == 0) delete node.w;
 				if (node.h == 0) delete node.h;
 				if (node.id) delete node.id;
-				for (i in node) {
+				for (var i in node) {
 					if (typeof node[i] === 'number') {
 						node[i] = parseFloat(node[i].toFixed(4));
 					} else if (i != 'c' && i != 'e' && typeof node[i] === 'object') {
@@ -154,7 +154,7 @@
 						delete node[i];
 					}
 				}
-				for (i in node.c) {
+				for (var i in node.c) {
 					if (node.c[i] && node.c[i] != null) Tree2d.clean(node.c[i]);
 					else delete node.c[i];
 				}
@@ -187,7 +187,7 @@
 			del: function(node) {
 				var parent = node.parent;
 				if (parent) {
-					for (i in parent.c) {
+					for (var i in parent.c) {
 						if (parent.c[i] == node) {
 							parent.c[i] = 0;
 							delete parent.c[i];
@@ -226,7 +226,13 @@
 				var arr = line.split(/\b/), f;
 				for (k in arr) {
 					if (arr[k].charAt(0) == '_') {
-						arr[k] = 'Tree2d.findByName("'+arr[k].substr(1)+'")';
+						arr[k] = arr[k].substr(1);
+						var n = Tree2d.findByName(arr[k]);
+						if (!n) {
+							alert ('Unknown node name "'+arr[k]+'" at line "'+line+'"');
+							return '';
+						}
+						arr[k] = 'Tree2d.findByName("'+arr[k]+'")';
 						continue;
 					}
 					
@@ -277,13 +283,14 @@
 			cookUpdate: function(node) {
 				if (!node.e) return;
 				var str = '(function(n) {\n', cnt = 0;
-				for (i in node.e) {
+				for (var i in node.e) {
 					if (i == 'init') continue;
 					if (i == 'box collision') str += '\nif (Tree2d.boxCollision(n)) {\n';
 					if (i == 'click') str += '\nif (Tree2d.mousedown && Tree2d.getClickedObject({x:Tree2d.mousedown.x-Tree2d.cameraobj.x,y:Tree2d.mousedown.y-Tree2d.cameraobj.y}) == n) {\n';
 					str += Tree2d.makeFunction(node, node.e[i]);
 					if (i == 'click' || i == 'box collision') str += '\n}';
 					cnt++;
+					str += ';';
 				}
 				str += '\n})';
 				
@@ -360,22 +367,14 @@
 			},
 			
 			// если узел с именем name не найден - вернет undefined
-			findByName: function(name) {
-				var n = Tree2d.root;
+			findByName: function(name, n) {
+				n = n || Tree2d.root;
+				if (n.name == name) return n;
 				
-				while (n) {
-					if (n.name == name) {
-						return n;
-					} else if (n.child) {
-						n = n.child;
-					} else {
-						while (n) {
-							if (n.next) {
-								n = n.next;
-								break;
-							}
-							n = n.parent;
-						}
+				if (n.c) {
+					for (var i in n.c) {
+						var val = Tree2d.findByName(name, n.c[i]);
+						if (val) return val;
 					}
 				}
 			},
@@ -470,7 +469,7 @@
 				}
 				
 				arr = arr.reverse();
-				for (i in arr) {
+				for (var i in arr) {
 					if (Tree2d.isObjectClicked(arr[i], pos)) {
 						return arr[i];
 					}
@@ -488,7 +487,7 @@
 			fall: function(node) {
 				if (!node.parent) return;
 				var p = node.parent, i, j;
-				for (i in p.c) {
+				for (var i in p.c) {
 					if (p.c[i] == node) break;
 					j = i;
 				}
@@ -496,10 +495,10 @@
 					var c = p.c[i];
 					p.c[i] = p.c[j];
 					p.c[j] = c;
-					for (i in p.c) if (p.c[i].next) delete p.c[i].next;
+					for (var i in p.c) if (p.c[i].next) delete p.c[i].next;
 					
 					var prev;
-					for (i in p.c) {
+					for (var i in p.c) {
 						var val = p.c[i];
 						if (!val.parent) val.parent = p;
 						if (!prev) p.child = val;
@@ -600,7 +599,7 @@
 			loadSprite: function(name) {
 				if (ed.assets[name]) return ed.assets[name];
 				
-				ed.assets[name] = {src: name, e:{init:'sprite'}};
+				ed.assets[name] = {src: name, name:name.substr(0, name.lastIndexOf('.')), e:{init:'sprite'}};
 				ed.loadImage(name);
 				
 				document.getElementById('assets').innerHTML += '<div id="'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white;" onclick="ed.selectAsset(\''+name+'\')" ><img src="'+name+'" ondblclick="ed.placeAsset(\''+name+'\')" onload="ed.alignAssetSize(this, 60)" /></div>';
@@ -695,8 +694,8 @@
 					if (!ed.brush.grid) ed.brush.grid = 1;
 					if (!ed.grid) ed.grid = 1;
 					if (ed.selected != ed.root) pos = Tree2d.convertPointToNodeTransform(ed.selected.parent, pos);
-					pos.x = Math.floor((pos.x + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
-					pos.y = Math.floor((pos.y + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
+					pos.x = Math.round((pos.x + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
+					pos.y = Math.round((pos.y + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
 					pos.x += Math.random() * ed.brush.random * 2 - ed.brush.random;
 					pos.y += Math.random() * ed.brush.random * 2 - ed.brush.random;
 					ed.brush.dragPos = pos;
@@ -726,8 +725,8 @@
 					} else {
 						var x = ed.tmpSelectedTrans.x + (pos.x - ed.tmpMousePos.x);
 						var y = ed.tmpSelectedTrans.y + (pos.y - ed.tmpMousePos.y);
-						var x1 = Math.floor((x + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
-						var y1 = Math.floor((y + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
+						var x1 = Math.round((x + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
+						var y1 = Math.round((y + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
 						if (Math.abs(x1 - x) < 10) x = x1;
 						if (Math.abs(y1 - y) < 10) y = y1;
 						ed.set('x', x);
@@ -741,8 +740,8 @@
 					if (ed.selected != ed.root) pos = Tree2d.convertPointToNodeTransform(ed.selected.parent, pos);
 					if (Math.abs(pos.x - ed.brush.dragPos.x) > ed.brush.grid * 0.75 || Math.abs(pos.y - ed.brush.dragPos.y) > ed.brush.grid * 0.75) {
 						if (!ed.grid) ed.grid = 1;
-						pos.x = Math.floor((pos.x + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
-						pos.y = Math.floor((pos.y + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
+						pos.x = Math.round((pos.x + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
+						pos.y = Math.round((pos.y + ed.brush.grid / 2) / ed.brush.grid) * ed.brush.grid;
 						pos.x += Math.random() * ed.brush.random* 2 - ed.brush.random;
 						pos.y += Math.random() * ed.brush.random * 2 - ed.brush.random;
 						ed.brush.dragPos = pos;
@@ -838,7 +837,7 @@
 					t++;
 					
 					var s = '', i = 0;
-					for (i = 0; i < t; i++) s += '-';
+					for (var i = 0; i < t; i++) s += '-';
 					var name = n.name;
 					if (!n.name || name == '')  name = '';
 					else name = ' ' + name;
@@ -910,7 +909,7 @@
 				<input type="checkbox" onclick="this.select()" onchange="ed.set(\'a\',this.checked)" id="edit-a-checkbox" '+(node.a>0?"checked":"")+' /><br />';
 				
 				str += '<table>';
-				for (i in node) {
+				for (var i in node) {
 					var flag = false;
 					for (j in excluded) if (i == excluded[j]) flag = true;
 					if (flag) continue;
@@ -920,7 +919,7 @@
 						str += '<tr><td><input type="text" value="'+name+'" readonly style="width:80px" /></td><td><input type="number" onclick="this.select()" onchange="ed.set(\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /></td><td><input type="button" value="-" onclick="ed.deleteAttr(\''+name+'\')"></td></tr>';
 					}
 				}
-				for (i in node) {
+				for (var i in node) {
 					var flag = false;
 					for (j in excluded) if (i == excluded[j]) flag = true;
 					if (flag) continue;
@@ -934,7 +933,7 @@
 				str += 'Events:<br /><table>';
 				excluded = [];
 				if (node.e) {
-					for (i in node.e) {
+					for (var i in node.e) {
 						str += '<tr><td><input type="text" value="'+i+'" readonly style="width:80px" /></td><td><input type="text" onclick="this.select()" onchange="ed.setEvent(\''+i+'\', this.value)" value='+node.e[i]+' /></td><td><input type="button" value="-" onclick="ed.deleteEvent(\''+i+'\')"></td></tr>';
 						excluded.push(i);
 					}
@@ -942,7 +941,7 @@
 				str += '</table>';
 				
 				var tmpstr = '';
-				for (i in ed.eventTypes) {
+				for (var i in ed.eventTypes) {
 					var name = ed.eventTypes[i];
 					var flag = true;
 					for (j in excluded) {
@@ -1001,7 +1000,7 @@
 			addAttribute: function() {
 				var name = document.getElementById('addAttributeName').value;
 				var excluded = ['x', 'y', 'r', 'w', 'h', 'zx', 'zy', 'a', 'src', 'id', 'class', 'update', 'draw', 'init'];
-				for (i in excluded) {
+				for (var i in excluded) {
 					if (excluded[i] == name) {
 						alert('Attribute name '+name+' is reserved.');
 						return;
@@ -1056,7 +1055,7 @@
 								if (n == ed.selected && n.c) {
 									ctx.lineWidth = 1;
 									ctx.beginPath();
-									for (i in n.c) {
+									for (var i in n.c) {
 										ctx.moveTo(0, 0);
 										ctx.lineTo(n.c[i].x, n.c[i].y);
 									}
@@ -1084,10 +1083,12 @@
 			// переключает состояние редактора из "редактирование" в "просмотр" и обратно
 			runGame: function(btn) {
 				if (!ed.run) {
+					ctx.save();
 					Tree2d.root = Tree2d.copy(ed.root);
 					Tree2d.init(Tree2d.root);
 					btn.value = 'Stop';
 				} else {
+					ctx.restore();
 					delete Tree2d.root;
 					Tree2d.root = ed.root;
 					btn.value = 'Run';
@@ -1100,11 +1101,11 @@
 		// выбрать случайный объект из объекта obj
 		function getRandField(obj) {
 			var size = 0;
-			for (i in obj) if (typeof obj == 'object') {
+			for (var i in obj) if (typeof obj == 'object') {
 				size++;
 			}
-			var n = Math.floor(Math.random() * size), k = 0;
-			for (i in obj) {
+			var n = Math.round(Math.random() * size), k = 0;
+			for (var i in obj) {
 				if (k == n) return obj[i];
 				k++;
 			}
@@ -1123,7 +1124,7 @@
 		// с количеством вершин npol
 		function pnpoly(npol, xp, yp, x, y) {
 			var i, j, c = false;
-			for (i = 0, j = npol-1; i < npol; j = i++) {
+			for (var i = 0, j = npol-1; i < npol; j = i++) {
 				if ((((yp[i] <= y) && (y < yp[j])) ||
 				     ((yp[j] <= y) && (y < yp[i]))) &&
 				    (x < (xp[j] - xp[i]) * (y - yp[i]) / (yp[j] - yp[i]) + xp[i]))
