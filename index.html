@@ -44,6 +44,7 @@
 			ed.select(0);
 			ed.renewHierarhy();
 			ed.addAssetFromString('node.json', '{}');
+			ed.addAssetFromString('sprite.json', '{"e":{"init":"sprite"}}');
 			setInterval(ed.cycle, 10);
 		}
 		
@@ -112,8 +113,8 @@
 				if (!node.zy) node.zy = 1;
 				if (!node.w) node.w = 0;
 				if (!node.h) node.h = 0;
-				if (!node.a) node.a = 1;
-				if (!node.id) node.id = Tree2d.genId();
+				if (node.a == undefined) node.a = 1;
+				if (node.id == undefined) node.id = Tree2d.genId();
 				Tree2d.cookUpdate(node);
 				if (node.init) node.init(node);
 				if (node.c) {
@@ -149,7 +150,7 @@
 				for (var i in node) {
 					if (typeof node[i] === 'number') {
 						node[i] = parseFloat(node[i].toFixed(4));
-					} else if (i != 'c' && i != 'e' && typeof node[i] === 'object') {
+					} else if (i != 'c' && i != 'e' && typeof node[i] === 'object' && !node[i].substring) {
 						node[i] = 0;
 						delete node[i];
 					}
@@ -568,7 +569,8 @@
 			},
 			
 			// "вписывает" картинку img в квадрат size*size
-			alignAssetSize: function(img, size) {
+			alignAssetSize: function(img, size, name) {
+				if (name) document.getElementById(name).title = name + ' ('+img.width+'x'+img.height+')';
 				var d = img.width / img.height;
 				if (img.width > img.height) {
 					img.width = size;
@@ -602,7 +604,7 @@
 				ed.assets[name] = {src: name, name:name.substr(0, name.lastIndexOf('.')), e:{init:'sprite'}};
 				ed.loadImage(name);
 				
-				document.getElementById('assets').innerHTML += '<div id="'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white;" onclick="ed.selectAsset(\''+name+'\')" ><img src="'+name+'" ondblclick="ed.placeAsset(\''+name+'\')" onload="ed.alignAssetSize(this, 60)" /></div>';
+				document.getElementById('assets').innerHTML += '<div id="'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white;" onclick="ed.selectAsset(\''+name+'\')" ><img src="'+name+'" ondblclick="ed.placeAsset(\''+name+'\')" onload="ed.alignAssetSize(this, 60, \''+name+'\')" /></div>';
 				return ed.assets[name];
 			},
 			
@@ -874,10 +876,16 @@
 			// устанавливает параметр param выделенной ноды равным value
 			set: function(param, value) {
 				var node = ed.selected;
-				if (typeof(value) === 'boolean') {
-					node[param] = (value?1:0);
-					document.getElementById('edit-'+param).value = node[param];
-					document.getElementById('edit-'+param+'-checkbox').checked = (node[param]>0?true:false);
+				if (param == 'a') {
+					if (typeof value == 'number') {
+						node.a = value;
+						document.getElementById('edit-a').value = node.a;
+						document.getElementById('edit-a-checkbox').checked = (node.a>0?true:false);
+					} else {
+						node.a = value?1:0;
+						document.getElementById('edit-a').value = node.a;
+						document.getElementById('edit-a-checkbox').checked = (node.a>0?true:false);
+					}
 				} else if (typeof node[param] === 'number') {
 					if (typeof parseFloat(value) === 'number') {
 						node[param] = parseFloat(value);
@@ -890,12 +898,13 @@
 					if (document.getElementById('edit-'+param+'-checkbox')) document.getElementById('edit-'+param+'-checkbox').checked = (node[param]>0?true:false);
 				} else node[param] = value;
 				if (param == 'name') ed.renewHierarhy();
+				Tree2d.init(ed.selected);
 			},
 			
 			// обновляет блок информации о ноде
 			updateInfo: function() {
 				var node = ed.selected;
-				var excluded = ['id', 'src', 'class'];
+				var excluded = ['id', 'class'];
 				var str = '\
 				<input type="text" value="Name" readonly style="width:80px" /><input type="text" onclick="this.select()" onchange="ed.set(\'name\',this.value)" id="edit-name" value="'+(node.name?node.name:'')+'" /><br />\
 				<input type="text" value="Position" readonly style="width:80px" /><input style="width:80px" type="number" onclick="this.select()" onchange="ed.set(\'x\',this.value)" id="edit-x" value="'+node.x+'" />\
@@ -925,7 +934,7 @@
 					if (flag) continue;
 					if (typeof node[i] == 'string' && i != 'name') {
 						var name = i;
-						str += '<tr><td>'+name+'</td><td><input type="text" onclick="this.select()" onchange="ed.set(\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /></td></tr>';
+						str += '<tr><td><input type="text" value="'+name+'" readonly style="width:80px" /></td><td><input type="text" onclick="this.select()" onchange="ed.set(\''+i+'\',this.value)" id="edit-'+i+'" value='+node[i]+' /></td></tr>';
 					}
 				}
 				str += '</table><input id="addAttributeName" type="text" placeholder="key" onkeydown="ed.trySubmit(event, \'addAttrBtn\')" /><input id="addAttrBtn" type="button" value="Add" onclick="ed.addAttribute()" /><br />';
@@ -966,12 +975,14 @@
 			// устанавливает выделеной ноде обработчик ивента, заодно компилит его и проверяет
 			setEvent: function(name, val) {
 				ed.selected.e[name] = val;
-				Tree2d.cookUpdate(ed.selected);
+				Tree2d.init(ed.selected);
+				ed.updateInfo();
 			},
 			
 			// удаляет из выделенной ноды ивент
 			deleteEvent: function(name) {
 				delete ed.selected.e[name];
+				Tree2d.init(ed.selected);
 				ed.updateInfo();
 			},
 			
@@ -1135,11 +1146,19 @@
 		
 		// инициализирует узел - спрайт
 		function sprite(node) {
-			node.img = ed.loadImage(node.src);
-			if (!node.w) node.w = node.img.width;
-			if (!node.h) node.h = node.img.height;
-			node.draw = function(node) {
-				ctx.drawImage(node.img, -node.img.width / 2, -node.img.height / 2);
+			if (!node.src) node.src = '#ffffff';
+			if (node.src.charAt(0) == '#') {
+				node.draw = function(node) {
+					ctx.fillStyle = node.src;
+					ctx.fillRect(-node.w / 2, -node.h / 2, node.w, node.h);
+				}
+			} else if (node.src && node.src != '') {
+				node.img = ed.loadImage(node.src);
+				if (!node.w) node.w = node.img.width;
+				if (!node.h) node.h = node.img.height;
+				node.draw = function(node) {
+					ctx.drawImage(node.img, -node.img.width / 2, -node.img.height / 2);
+				}
 			}
 		}
 	}</script>
