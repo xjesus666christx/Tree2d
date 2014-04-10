@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html>
-	<head><script src="classes.js"></script></head>
 	<body onselectstart="return false"  oncontextmenu="return false">
 		<div style="min-width:960px;width:77%;height:650px;overflow:scroll;float:left">
 			<canvas id="myCanvas" width="512" height="512" style="border:1px solid #999999;">
@@ -661,8 +660,8 @@
 				var reader = new FileReader();
 				reader.onload = function(e) {
 					var node = JSON.parse(e.target.result);
-					Tree2d.init(node);
 					ed.root = Tree2d.root = node;
+					Tree2d.init(node);
 					
 					ed.renewHierarhy();
 					ed.select(node.id);
@@ -675,7 +674,9 @@
 			
 			// выплевывает файл .json, названный как корень, содержащий иерархию сцены в JSON
 			saveProject: function() {
-				var text = JSON.stringify(Tree2d.clean(Tree2d.copy(Tree2d.root)));
+				var c = Tree2d.clean(Tree2d.copy(Tree2d.root));
+				var text = JSON.stringify(c);
+				text = text.split(',null').join('');
 				var pom = document.createElement('a');
 				pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
 				pom.setAttribute('download', ed.root.name + '.json');
@@ -1160,6 +1161,71 @@
 					ctx.drawImage(node.img, -node.img.width / 2, -node.img.height / 2);
 				}
 			}
+		}
+		
+		function interpolateDegrees(start, end, amount) {
+			var difference = Math.abs(end - start);
+			if (difference > 180) {
+				if (end > start) {
+					start += 360;
+				} else {
+					end += 360;
+				}
+			}
+			
+			return (start + ((end - start) * amount));
+		}
+		
+		function animation(node) {
+			node.update = function(node) {
+				var f = node.f;
+				var n = node.n;
+				if (!f || !n || node.tmp.t > f.time) {
+					if (node.f) {
+						node.f.x = node.tmp.x;
+						node.f.y = node.tmp.y;
+						node.f.zx = node.tmp.zx;
+						node.f.zy = node.tmp.zy;
+						node.f.r = node.tmp.r;
+						node.f.a = node.tmp.a;
+					}
+					node.f = node.n;
+					if (!node.f) node.f = node.child;
+					node.n = node.f.next;
+					if (!node.n) {
+						node.f = node.child;
+						node.n = node.f.next;
+					}
+					node.tmp.t = 0;
+					if (!node.f.time) node.f.time = node.frameTime;
+					Tree2d.select(node.f);
+					if (node.f) {
+						node.tmp.x = node.f.x;
+						node.tmp.y = node.f.y;
+						node.tmp.zx = node.f.zx;
+						node.tmp.zy = node.f.zy;
+						node.tmp.r = node.f.r;
+						node.tmp.a = node.f.a;
+						node.f.x = 0;
+						node.f.y = 0;
+						node.f.zx = 1;
+						node.f.zy = 1;
+						node.f.r = 0;
+						node.f.a = 1;
+					}
+				} else {
+					f = node.tmp;
+					var dt = node.tmp.t / node.f.time;
+					node.x = f.x + (n.x - f.x) * dt;
+					node.y = f.y + (n.y - f.y) * dt;
+					node.zx = f.zx + (n.zx - f.zx) * dt;
+					node.zy = f.zy + (n.zy - f.zy) * dt;
+					node.r = interpolateDegrees(f.r, n.r, dt);
+					node.a = f.a + (n.y - f.a) * dt;
+					node.tmp.t += node.speed;
+				}
+			}
+			node.tmp = {t:0, x:0, y:0, r:0, zx:1, zy:1, a:1};
 		}
 	}</script>
 </html>
