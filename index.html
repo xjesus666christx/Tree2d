@@ -66,6 +66,8 @@
 				name:'root' // имя узла (по нему тоже можно искать узел в дереве)
 			},
 			
+			backup: undefined, // для ф-ии reset
+			
 			mousedown: {},
 			mousemove: {},
 			mouseup: {},
@@ -223,8 +225,8 @@
 				var noan = /^\W$/;
 				line = line.split('\n').join(';');
 				
-				var arr = line.split(/\b/), f;
-				for (k in arr) {
+				var arr = line.split(/\b/);
+				for (var k in arr) {
 					if (arr[k].charAt(0) == '_') {
 						arr[k] = arr[k].substr(1);
 						var n = Tree2d.findByName(arr[k]);
@@ -236,6 +238,7 @@
 						continue;
 					}
 					
+					var next = arr[parseFloat(k)+1];
 					var prev = arr[parseFloat(k)-1];
 					if (prev && prev == '.') continue;
 					
@@ -254,10 +257,11 @@
 						}
 					}
 					
+					var f = undefined;
 					try {
 						f = eval(arr[k]);
 					} catch (e) {}
-					if (typeof f == 'function') {
+					if (typeof f == 'function' && (!next || (next && next != '('))) {
 						arr[k] += '(n)';
 						flag = true;
 					}
@@ -273,7 +277,7 @@
 					eval('(function(n){'+line+'})');
 				} catch (e) {
 					alert('Error in "'+line+'": ' + e);
-					line = '';
+					return '';
 				}
 				
 				return line;
@@ -377,6 +381,18 @@
 						if (val) return val;
 					}
 				}
+			},
+			
+			reset: function(n) {
+				if (!n.name) return;
+				var b = Tree2d.findByName(n.name, Tree2d.backup);
+				var backup = Tree2d.copy(b);
+				for (i in backup) {
+					if (i != 'next' && i != 'parent') {
+						n[i] = backup[i];
+					}
+				}
+				Tree2d.init(n);
 			},
 			
 			// получить позицию, поворот, скейл и непрозрачность отрисовки узла
@@ -785,6 +801,7 @@
 			
 			// вставляет один из выделенных ассетов в выделенный узел на позиции pos
 			pasteAsset: function(pos) {
+				pos = pos || {x: 0, y: 0};
 				var c = getRandField(ed.selectedAssets);
 				pos = Tree2d.convertPointToNodeTransform(ed.selected, pos);
 				c.x = pos.x;
@@ -1097,6 +1114,7 @@
 				if (!ed.run) {
 					ctx.save();
 					Tree2d.root = Tree2d.copy(ed.root);
+					Tree2d.backup = Tree2d.copy(Tree2d.root);
 					Tree2d.init(Tree2d.root);
 					btn.value = 'Stop';
 				} else {
