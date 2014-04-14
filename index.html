@@ -31,7 +31,7 @@
 		
 		onload = function() {
 			canvas = document.getElementById("myCanvas");
-			canvas.addEventListener('mousedown', function(evt) {if (ed.run) {Tree2d.mousedown=getMousePos(canvas, evt)} else {if (evt.button == 0) ed.mousePress(getMousePos(canvas, evt)); else ed.pick(getMousePos(canvas, evt));}}, false);
+			canvas.addEventListener('mousedown', function(evt) {if (ed.run) {Tree2d.click(getMousePos(canvas, evt))} else {if (evt.button == 0) ed.mousePress(getMousePos(canvas, evt)); else ed.pick(getMousePos(canvas, evt));}}, false);
 			canvas.addEventListener('mousemove', function(evt) {if (ed.run) {Tree2d.mousemove=getMousePos(canvas, evt)} else {if (evt.button == 0) ed.mouseMove(getMousePos(canvas, evt)); else ed.drag(getMousePos(canvas, evt));}}, false);
 			canvas.addEventListener('mouseup',   function(evt) {if (ed.run) {Tree2d.mouseup=getMousePos(canvas, evt)} else {if (evt.button == 0) ed.mouseRelease(getMousePos(canvas, evt)); else ed.unpick();}}, false);
 			canvas.addEventListener('mouseout',   function(evt) {if (ed.run) {Tree2d.mouseup=getMousePos(canvas, evt)} else {if (evt.button == 0) ed.mouseRelease(0); else ed.unpick();}}, false);
@@ -69,6 +69,13 @@
 			backup: undefined, // для ф-ии reset
 			
 			mousedown: {},
+			click: function(pos) {
+				if (Tree2d.cameraobj) {
+					pos.x -= Tree2d.cameraobj.x;
+					pos.y -= Tree2d.cameraobj.y;
+				}
+				Tree2d.mousedown = Tree2d.getClickedObject(pos);
+			},
 			mousemove: {},
 			mouseup: {},
 			cameraobj: {},
@@ -290,7 +297,7 @@
 				for (var i in node.e) {
 					if (i == 'init') continue;
 					if (i == 'box collision') str += '\nif (Tree2d.boxCollision(n)) {\n';
-					if (i == 'click') str += '\nif (Tree2d.mousedown && Tree2d.getClickedObject({x:Tree2d.mousedown.x-Tree2d.cameraobj.x,y:Tree2d.mousedown.y-Tree2d.cameraobj.y}) == n) {\n';
+					if (i == 'click') str += '\nif (Tree2d.mousedown == n) {\n';
 					str += Tree2d.makeFunction(node, node.e[i]);
 					if (i == 'click' || i == 'box collision') str += '\n}';
 					cnt++;
