@@ -704,7 +704,11 @@
 					var name = f.name.substr(f.name.lastIndexOf('/') + 1);
 					if (f.type == 'image/png' || f.type == 'image/jpeg') {
 						ed.loadSprite(name, f);
-					} else if (f.type == 'application/json') {
+					}
+				}
+				for (var i = 0, f; f = files[i]; i++) {
+					var name = f.name.substr(f.name.lastIndexOf('/') + 1);
+					if (f.type == 'application/json') {
 						ed.loadNode(name, f);
 					}
 				}
