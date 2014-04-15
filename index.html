@@ -390,7 +390,7 @@
 			findByName: function(name, n) {
 				var a = name.split('%');
 				if (a.length > 1) {
-					if (Tree2d.root[a[1]]) {
+					if (typeof Tree2d.root[a[1]] === 'number') {
 						a[1] = Tree2d.root[a[1]];
 						name = a.join('');
 					} else {
@@ -400,7 +400,7 @@
 				} else {
 					a = name.split('PeRcEnT');
 					if (a.length > 1) {
-						if (Tree2d.root[a[1]]) {
+						if (typeof Tree2d.root[a[1]] === 'number') {
 							a[1] = Tree2d.root[a[1]];
 							name = a.join('');
 						} else {
