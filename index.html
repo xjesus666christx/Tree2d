@@ -231,22 +231,26 @@
 				var numetric = /^[0-9]+$/;
 				var noan = /^\W$/;
 				line = line.split('\n').join(';');
+				line = line.split('%').join('PeRcEnT');
 				
 				var arr = line.split(/\b/);
 				for (var k in arr) {
+					var next = arr[parseFloat(k)+1];
+					var prev = arr[parseFloat(k)-1];
+					
 					if (arr[k].charAt(0) == '_') {
 						arr[k] = arr[k].substr(1);
 						var n = Tree2d.findByName(arr[k]);
 						if (!n) {
-							alert ('Unknown node name "'+arr[k]+'" at line "'+line+'"');
+							var text = 'Unknown node name "'+arr[k]+'" at line "'+line+'"';
+							if (node.name) text = 'In node "'+node.name+'": '+text;
+							alert (text);
 							return '';
 						}
 						arr[k] = 'Tree2d.findByName("'+arr[k]+'")';
 						continue;
 					}
 					
-					var next = arr[parseFloat(k)+1];
-					var prev = arr[parseFloat(k)-1];
 					if (prev && prev == '.') continue;
 					
 					var flag = false;
@@ -274,7 +278,9 @@
 					}
 					
 					if (alphanumetric.test(arr[k]) && !flag) {
-						alert ('Unknown identifier "'+arr[k]+'" at line "'+line+'"');
+						var text = 'Unknown identifier "'+arr[k]+'" at line "'+line+'"';
+						if (node.name) text = 'In node "'+node.name+'": '+text;
+						alert (text);
 						return '';
 					}
 				}
@@ -283,9 +289,12 @@
 				try {
 					eval('(function(n){'+line+'})');
 				} catch (e) {
-					alert('Error in "'+line+'": ' + e);
+					var text = 'Error in "'+line+'": ' + e;
+					if (node.name) text = 'In node "'+node.name+'": '+text;
+					alert (text);
 					return '';
 				}
+				line = line.split('PeRcEnT').join('%');
 				
 				return line;
 			},
@@ -379,6 +388,28 @@
 			
 			// если узел с именем name не найден - вернет undefined
 			findByName: function(name, n) {
+				var a = name.split('%');
+				if (a.length > 1) {
+					if (Tree2d.root[a[1]]) {
+						a[1] = Tree2d.root[a[1]];
+						name = a.join('');
+					} else {
+						alert('Game root has no fields named "'+a[1]+'"');
+						return;
+					}
+				} else {
+					a = name.split('PeRcEnT');
+					if (a.length > 1) {
+						if (Tree2d.root[a[1]]) {
+							a[1] = Tree2d.root[a[1]];
+							name = a.join('');
+						} else {
+							alert('Game root has no fields named "'+a[1]+'"');
+							return;
+						}
+					}
+				}
+				
 				n = n || Tree2d.root;
 				if (n.name == name) return n;
 				
@@ -582,11 +613,11 @@
 			pickup: false,
 			
 			// грузит картинку, избегает дубликатов
-			loadImage: function(name) {
+			loadImage: function(name, data) {
 				if (ed.images[name]) return ed.images[name];
 				ed.images[name] = new Image;
-				ed.images[name].src = name;
-				if (!ed.assets[name]) ed.loadSprite(name);
+				ed.images[name].src = data;
+				//if (!ed.assets[name]) ed.loadSprite(name);
 				return ed.images[name];
 			},
 			
@@ -620,13 +651,17 @@
 			},
 			
 			// грузит картинку, создает ассет с именем name
-			loadSprite: function(name) {
+			loadSprite: function(name, file) {
 				if (ed.assets[name]) return ed.assets[name];
 				
-				ed.assets[name] = {src: name, name:name.substr(0, name.lastIndexOf('.')), e:{init:'sprite'}};
-				ed.loadImage(name);
+				var reader = new FileReader();
+				reader.onload = function(e) {
+					ed.loadImage(name, e.target.result);
+					ed.assets[name] = {src: name, name:name.substr(0, name.lastIndexOf('.')), e:{init:'sprite'}};
+					document.getElementById('assets').innerHTML += '<div id="'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white;" onclick="ed.selectAsset(\''+name+'\')" ><img src="'+e.target.result+'" ondblclick="ed.placeAsset(\''+name+'\')" onload="ed.alignAssetSize(this, 60, \''+name+'\')" /></div>';
+				}
+				var result = reader.readAsDataURL(file);
 				
-				document.getElementById('assets').innerHTML += '<div id="'+name+'" title="'+name+'" style="float:left; width:60px; height:60px; border:2px solid #f7f4a0; background-color:white;" onclick="ed.selectAsset(\''+name+'\')" ><img src="'+name+'" ondblclick="ed.placeAsset(\''+name+'\')" onload="ed.alignAssetSize(this, 60, \''+name+'\')" /></div>';
 				return ed.assets[name];
 			},
 			
@@ -668,7 +703,7 @@
 				for (var i = 0, f; f = files[i]; i++) {
 					var name = f.name.substr(f.name.lastIndexOf('/') + 1);
 					if (f.type == 'image/png' || f.type == 'image/jpeg') {
-						ed.loadSprite(name);
+						ed.loadSprite(name, f);
 					} else if (f.type == 'application/json') {
 						ed.loadNode(name, f);
 					}
