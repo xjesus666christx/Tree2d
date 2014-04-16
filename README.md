@@ -3,6 +3,10 @@ Tree2d
 Free opensource HTML5 game editor with hierarhy, assets and configurable brush.
 Ability to assemble and test your game in a browser.
 
+STATUS
+------
+In development.
+
 HOW TO USE
 ----------
 1. Add some assets with file chooser
