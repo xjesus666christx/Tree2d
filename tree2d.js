@@ -442,11 +442,28 @@ Tree2d.prototype.findByName = function(name, n) {
 		}
 	}
 	
-	for (i in n) if (typeof n[i] === 'object' && this.isNodeName(i)) {
+	/*for (i in n) if (typeof n[i] === 'object' && this.isNodeName(i)) {
 		if (i === name) return n[i];
 		var result = this.findByName(name, n[i]);
 		if (result) return result;
+	}*/
+	
+	while (n) {
+		if (n.a && n.child) {
+			n = n.child;
+		} else {
+			while (n) {
+				if (typeof n[name] === 'object') return n[name];
+				if (n.next) {
+					n = n.next;
+					break;
+				}
+				n = n.parent;
+			}
+		}
 	}
+	//console.log('Node "'+name+'" not found');
+	//throw new Error(name);
 };
 
 // получить позицию, поворот, скейл и непрозрачность отрисовки узла
@@ -654,6 +671,7 @@ Tree2d.prototype.click = function(evt) {
 		} else if (event.ctrlKey && evt.button === 2) {
 			this.del(this.clicked);
 			this.highlighted = this.clicked = undefined;
+			this.cycle();
 			return;
 		}
 	
@@ -709,7 +727,7 @@ Tree2d.prototype.release = function(evt) {
 	this.mouseup = pos;
 	this.clicked = undefined;
 	
-	if (this.edit && this.highlighted) {
+	if (this.edit && this.clicked) {
 		this.guide = undefined;
 		if (this.onchange) this.onchange(this.clean(this.copy(this.root, true)));
 		if (this.onselect) {
@@ -756,7 +774,7 @@ Tree2d.prototype.pnpoly = function(npol, xp, yp, x, y) {
 	return c;
 };
 
-// объект с именем n.src типа теперь потомок объекта n1? но на самом деле нет
+// объект с именем n.src типа теперь потомок объекта n1, но на самом деле нет
 Tree2d.prototype.link = function(n) {
 	if (n && n.src) {
 		n.drawCB = function(n, ctx) {
@@ -872,13 +890,13 @@ Tree2d.prototype.makeFunction = function(node, line) {
 
 		if (arr[k].charAt(0) == '_') {
 			arr[k] = arr[k].substr(1);
-			var n = this.findByName(arr[k]);
+			/*var n = this.findByName(arr[k]);
 			if (!n) {
 				var text = 'Unknown node name "'+arr[k]+'" at line "'+line+'"';
 				if (node.name) text = 'In node "'+node.name+'": '+text;
 				if (this.run) alert (text);
 				return '';
-			}
+			}*/
 			arr[k] = 't.findByName("'+arr[k]+'", t.root)';
 			continue;
 		}
