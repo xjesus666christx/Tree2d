@@ -41,6 +41,9 @@ function Tree2d(container, root) {
 	this.canvas.addEventListener('mousemove', function(evt) {self.drag(evt)}, false);
 	this.canvas.addEventListener('mouseup',   function(evt) {self.release(evt)}, false);
 	this.canvas.addEventListener('mouseout',  function(evt) {self.release(evt)}, false);
+	this.canvas.addEventListener('touchstart', function(evt) {self.click(evt)}, false);
+	this.canvas.addEventListener('touchmove', function(evt) {self.drag(evt)}, false);
+	this.canvas.addEventListener('touchend',   function(evt) {self.release(evt)}, false);
 	
 	root = root || { // корневой узел
 		x:0,  // позиция по Х
