@@ -761,6 +761,7 @@ Tree2d.prototype.release = function(evt) {
 		}
 		this.cycle();
 	}
+	evt.preventDefault();
 };
 
 // генерирует JSON - структуру того, что в редакторе, и выводит в лог
