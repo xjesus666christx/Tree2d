@@ -303,9 +303,20 @@ Tree2d.prototype.clean = function(node) {
 // перестраивает ссылки на следующий элемент среди потомков parent
 // инициализирует node
 Tree2d.prototype.add = function(parent, node) {
-	node = this.copy(node);
-	var name = 'n' + node.id;
+	var name, ename;
+	for (var i in node.parent) {
+		if (node.parent[i] === node) {
+			ename = i;
+			ename = ename.replace(/[0-9]+$/, '');
+			break;
+		}
+	}
+	for (var j = 0; j < 99999; j++) {
+		name = ename + j;
+		if (parent[name] === undefined) break;
+	}
 	
+	node = this.copy(node);
 	parent[name] = node;
 	node.parent = parent;
 	
@@ -599,29 +610,23 @@ Tree2d.prototype.alignObject = function(n, minh, minv) {
 	minv = minv || 20;
 	
 	if (Math.abs(n.x) < minh) {
-		//minh = Math.abs(n.x);
 		guide.horisontal = p;
 	}
 	if (Math.abs(n.y) < minv) {
-		//minv = Math.abs(n.y);
 		guide.vertical = p;
 	}
 	
 	if (!n.r) {
 		if (Math.abs(-n.x - n.w / 2) < minh) {
-			//minh = Math.abs(-n.x - n.w / 2);
 			guide.boundleft = p;
 		}
 		if (Math.abs(n.x - n.w / 2) < minh) {
-			//minh = Math.abs(n.x - n.w / 2);
 			guide.boundright = p;
 		}
 		if (Math.abs(-n.y - n.h / 2) < minv) {
-			//minv = Math.abs(-n.y - n.h / 2);
 			guide.boundtop = p;
 		}
 		if (Math.abs(n.y - n.h / 2) < minv) {
-			//minv = Math.abs(n.y - n.h / 2);
 			guide.boundbottom = p;
 		}
 	}
@@ -638,28 +643,22 @@ Tree2d.prototype.alignObject = function(n, minh, minv) {
 	while (c) {
 		if (n != c) {
 			if (Math.abs(n.x - c.x) < minh) {
-				//minh = Math.abs(n.x - c.x);
 				guide.horisontal = c;
 			}
 			if (Math.abs(n.y - c.y) < minv) {
-				//minv = Math.abs(n.y - c.y);
 				guide.vertical = c;
 			}
 			if (!n.r && !c.r) {
 				if (Math.abs((n.x - n.w / 2) - (c.x + c.w / 2)) < minh) {
-					//minh = Math.abs((n.x - n.w / 2) - (c.x + c.w / 2));
 					guide.boundright = c;
 				}
 				if (Math.abs((n.x + n.w / 2) - (c.x - c.w / 2)) < minh) {
-					//minh = Math.abs((n.x + n.w / 2) - (c.x - c.w / 2));
 					guide.boundleft = c;
 				}
 				if (Math.abs((n.y - n.h / 2) - (c.y + c.h / 2)) < minv) {
-					//minv = Math.abs((n.y - n.h / 2) - (c.y + c.h / 2));
 					guide.boundbottom = c;
 				}
 				if (Math.abs((n.y + n.h / 2) - (c.y - c.h / 2)) < minv) {
-					//minv = Math.abs((n.y + n.h / 2) - (c.y - c.h / 2));
 					guide.boundtop = c;
 				}
 			}
