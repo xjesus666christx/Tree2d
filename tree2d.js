@@ -577,10 +577,18 @@ Tree2d.prototype.getClickedObject = function(pos) {
 // получить позицию мыши внутри canvas
 Tree2d.prototype.getMousePos = function(canvas, evt) {
 	var rect = canvas.getBoundingClientRect();
-	var pos = {
-		x: evt.clientX - rect.left - canvas.width / 2,
-		y: evt.clientY - rect.top - canvas.height / 2
-	};
+	var pos;
+	if (evt.targetTouches) {
+		pos = {
+			x: evt.targetTouches[0].pageX - rect.left - canvas.width / 2,
+			y: evt.targetTouches[0].pageY - rect.top - canvas.height / 2
+		};
+	} else {
+		pos = {
+			x: evt.clientX - rect.left - canvas.width / 2,
+			y: evt.clientY - rect.top - canvas.height / 2
+		};
+	}
 	return pos;
 };
 
@@ -671,6 +679,7 @@ Tree2d.prototype.alignObject = function(n, minh, minv) {
 
 // обработчик клика
 Tree2d.prototype.click = function(evt) {
+	evt.preventDefault();
 	var pos = this.getMousePos(this.canvas, evt);
 	this.highlighted = this.clicked = this.getClickedObject(pos);
 	this.mousedown = pos;
@@ -704,6 +713,7 @@ Tree2d.prototype.click = function(evt) {
 
 // движение мыши с нажатием
 Tree2d.prototype.drag = function(evt) {
+	evt.preventDefault();
 	var pos = this.getMousePos(this.canvas, evt);
 	this.mousemove = pos;
 	
@@ -733,6 +743,7 @@ Tree2d.prototype.drag = function(evt) {
 
 // отпускание мыши
 Tree2d.prototype.release = function(evt) {
+	evt.preventDefault();
 	var pos = this.getMousePos(this.canvas, evt);
 	this.mouseup = pos;
 	this.clicked = undefined;
