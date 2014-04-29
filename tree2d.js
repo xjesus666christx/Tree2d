@@ -710,6 +710,7 @@ Tree2d.prototype.click = function(evt) {
 			this.onselect(i);
 		}
 	}
+	evt.preventDefault();
 };
 
 // движение мыши с нажатием
