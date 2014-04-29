@@ -420,12 +420,16 @@ Tree2d.prototype.findById = function(id, n) {
 	}
 };
 
+// в _name#param подставляет значение поля param из корня
+// т.е. если root[level] = 10, то _player#level преобразуется в _player10
+// ищется только в числе видимых
+// если нод с таким именем много - вернется та, что рисуется позже
 // если узел с именем name не найден - вернет undefined
 Tree2d.prototype.findByName = function(name, n) {
 	// TODO: cache finded nodes
 	n = n || this.root;
-	if (name.split('%').length > 1) {
-		var arr = name.split('%');
+	if (name.split('#').length > 1) {
+		var arr = name.split('#');
 		if (n[arr[1]]) {
 			arr[1] = n[arr[1]];
 			name = arr.join('');
@@ -447,13 +451,14 @@ Tree2d.prototype.findByName = function(name, n) {
 		var result = this.findByName(name, n[i]);
 		if (result) return result;
 	}*/
+	var r;
 	
 	while (n) {
-		if (n.a && n.child) {
+		if (n.a > 0 && typeof n[name] === 'object') r = n[name];
+		if (n.a > 0 && n.child) {
 			n = n.child;
 		} else {
 			while (n) {
-				if (typeof n[name] === 'object') return n[name];
 				if (n.next) {
 					n = n.next;
 					break;
@@ -462,6 +467,8 @@ Tree2d.prototype.findByName = function(name, n) {
 			}
 		}
 	}
+	
+	return r;
 	//console.log('Node "'+name+'" not found');
 	//throw new Error(name);
 };
@@ -727,7 +734,7 @@ Tree2d.prototype.release = function(evt) {
 	this.mouseup = pos;
 	this.clicked = undefined;
 	
-	if (this.edit && this.clicked) {
+	if (this.edit && this.highlighted) {
 		this.guide = undefined;
 		if (this.onchange) this.onchange(this.clean(this.copy(this.root, true)));
 		if (this.onselect) {
@@ -881,7 +888,7 @@ Tree2d.prototype.makeFunction = function(node, line) {
 	var numetric = /^[0-9]+$/;
 	var noan = /^\W$/;
 	line = line.split('\n').join(';');
-	line = line.split('%').join('ROOT');
+	line = line.split('#').join('ROOT');
 
 	var arr = line.split(/\b/);
 	for (var k in arr) {
@@ -944,7 +951,7 @@ Tree2d.prototype.makeFunction = function(node, line) {
 		if (this.run) alert (text);
 		return '';
 	}
-	line = line.split('ROOT').join('%');
+	line = line.split('ROOT').join('#');
 
 	return line;
 };
