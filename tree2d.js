@@ -710,7 +710,6 @@ Tree2d.prototype.click = function(evt) {
 			this.onselect(i);
 		}
 	}
-	evt.preventDefault();
 };
 
 // движение мыши с нажатием
@@ -761,7 +760,6 @@ Tree2d.prototype.release = function(evt) {
 		}
 		this.cycle();
 	}
-	evt.preventDefault();
 };
 
 // генерирует JSON - структуру того, что в редакторе, и выводит в лог
