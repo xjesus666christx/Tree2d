@@ -678,7 +678,6 @@ Tree2d.prototype.alignObject = function(n, minh, minv) {
 
 // обработчик клика
 Tree2d.prototype.click = function(evt) {
-	evt.preventDefault();
 	var pos = this.getMousePos(this.canvas, evt);
 	this.highlighted = this.clicked = this.getClickedObject(pos);
 	this.mousedown = pos;
@@ -690,6 +689,7 @@ Tree2d.prototype.click = function(evt) {
 			this.del(this.clicked);
 			this.highlighted = this.clicked = undefined;
 			this.cycle();
+			evt.preventDefault();
 			return;
 		}
 	
@@ -708,11 +708,11 @@ Tree2d.prototype.click = function(evt) {
 			this.onselect(i);
 		}
 	}
+	evt.preventDefault();
 };
 
 // движение мыши с нажатием
 Tree2d.prototype.drag = function(evt) {
-	evt.preventDefault();
 	var pos = this.getMousePos(this.canvas, evt);
 	this.mousemove = pos;
 	
@@ -738,11 +738,11 @@ Tree2d.prototype.drag = function(evt) {
 		}
 		this.cycle();
 	}
+	evt.preventDefault();
 };
 
 // отпускание мыши
 Tree2d.prototype.release = function(evt) {
-	evt.preventDefault();
 	var pos = this.getMousePos(this.canvas, evt);
 	this.mouseup = pos;
 	this.clicked = undefined;
@@ -759,6 +759,7 @@ Tree2d.prototype.release = function(evt) {
 		}
 		this.cycle();
 	}
+	evt.preventDefault();
 };
 
 // генерирует JSON - структуру того, что в редакторе, и выводит в лог
