@@ -44,6 +44,8 @@ function Tree2d(container, root) {
 	this.canvas.addEventListener('touchstart', function(evt) {self.click(evt)}, false);
 	this.canvas.addEventListener('touchmove', function(evt) {self.drag(evt)}, false);
 	this.canvas.addEventListener('touchend',   function(evt) {self.release(evt)}, false);
+	this.canvas.addEventListener('touchleave',   function(evt) {self.release(evt)}, false);
+	this.canvas.addEventListener('touchcancel',   function(evt) {self.release(evt)}, false);
 	
 	root = root || { // корневой узел
 		x:0,  // позиция по Х
@@ -708,7 +710,6 @@ Tree2d.prototype.click = function(evt) {
 			this.onselect(i);
 		}
 	}
-	evt.preventDefault();
 };
 
 // движение мыши с нажатием
@@ -759,7 +760,6 @@ Tree2d.prototype.release = function(evt) {
 		}
 		this.cycle();
 	}
-	evt.preventDefault();
 };
 
 // генерирует JSON - структуру того, что в редакторе, и выводит в лог
