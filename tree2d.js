@@ -24,7 +24,7 @@ function Tree2d(container, root) {
 		},
 		click: {
 			begin: '\nif (t.clicked === n) {\n',
-			end: '\n}'
+			end: '\nt.clicked=undefined;}'
 		}
 	};
 	
@@ -460,6 +460,8 @@ Tree2d.prototype.findByName = function(name, n) {
 		} else {
 			return;
 		}
+	} else if (name === 'root') {
+		return n;
 	}
 	
 	/*for (i in n) if (typeof n[i] === 'object' && this.isNodeName(i)) {
