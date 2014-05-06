@@ -72,7 +72,7 @@ Tree2d.prototype.set = function(json) {
 		this.init(json);
 		this.canvas.width = json.w;
 		this.canvas.height = json.h;
-		this.cycle();
+		this.debugCycle();
 	}
 };
 
@@ -85,8 +85,12 @@ Tree2d.prototype.changeEditMode = function(edit) {
 			delete this.run;
 		}
 		if (this.backup) this.root = this.backup;
+		this.debugCycle();
 	} else if (edit === false || edit === 'off') {
 		this.edit = false;
+		this.backup = this.root;
+		this.root = this.copy(this.backup, true); // для ф-ии reset
+		this.init(this.root);
 		this.run = setInterval(
 			(function(self) {
 				return function() {
@@ -95,34 +99,77 @@ Tree2d.prototype.changeEditMode = function(edit) {
 			})(this),
 			1000 / 60
 		);
-		this.backup = this.root;
-		this.root = this.copy(this.backup, true); // для ф-ии reset
 	} else {
-		this.edit = !this.edit;
-		if (this.edit) {
-			if (this.backup) this.root = this.backup;
-			if (this.run) {
-				clearInterval(this.run);
-				delete this.run;
-			}
-			this.cycle();
-		} else {
-			this.backup = this.root;
-			this.root = this.copy(this.backup, true); // для ф-ии reset
-			this.init(this.root);
-			this.run = setInterval(
-				(function(self) {
-					return function() {
-						self.cycle();
-					}
-				})(this),
-				1000 / 60
-			);
-		}
+		this.changeEditMode(!this.edit);
 	}
 	//console.log(this);
 	return this.edit;
 }
+
+// действия за 1 кадр: отрисовка и апдейт (с учетом редактора)
+Tree2d.prototype.debugCycle = function() {
+	var n = this.root;
+	var ctx = this.ctx;
+	
+	ctx.save();
+	ctx.fillRect(0, 0, this.root.w, this.root.h);
+	ctx.translate(this.root.w / 2, this.root.h / 2);
+	
+	while (n) {
+		ctx.save();
+		ctx.globalAlpha *= n.a;
+		ctx.translate(n.x, n.y);
+		ctx.rotate(n.r / 180 * Math.PI);
+		ctx.scale(n.zx, n.zy);
+	
+		if (n.a) {
+			if (n.drawCB) n.drawCB(n, ctx);
+		}
+		if (n.a && n.child) {
+			n = n.child;
+		} else {
+			while (n) {
+				if (this.highlighted === n) {
+					ctx.strokeStyle = 'white';
+					ctx.strokeRect(-n.w/2, -n.h/2, n.w, n.h);
+					var p = n.parent, i;
+					for (i in n.parent) if (n === p[i]) break;
+					ctx.fillStyle = 'white';
+					ctx.fillText(i+'', -n.w/2+5, n.h/2-5);
+					ctx.rotate(-n.r / 180 * Math.PI);
+					if (this.guide && this.guide.vertical) {
+						ctx.beginPath();
+						ctx.moveTo(-10000, 0);
+						ctx.lineTo(10000, 0);
+						ctx.stroke();
+					}
+					if (this.guide && this.guide.horisontal) {
+						ctx.beginPath();
+						ctx.moveTo(0, -10000);
+						ctx.lineTo(0, 10000);
+						ctx.stroke();
+					}
+				} else {
+					ctx.strokeStyle = 'gray';
+					ctx.strokeRect(-n.w/2, -n.h/2, n.w, n.h);
+				}
+	
+				ctx.restore();
+				if (n.next) {
+					n = n.next;
+					break;
+				}
+				n = n.parent;
+			}
+		}
+	}
+	
+	ctx.restore();
+	
+	this.mousedown = undefined;
+	this.mousemove = undefined;
+	this.mouseup = undefined;
+};
 
 // действия за 1 кадр: отрисовка и апдейт
 Tree2d.prototype.cycle = function() {
@@ -140,42 +187,38 @@ Tree2d.prototype.cycle = function() {
 		ctx.rotate(n.r / 180 * Math.PI);
 		ctx.scale(n.zx, n.zy);
 	
-		if (n.a) {
-			if (!this.edit && n.updateCB) n.updateCB(n, this);
-			if (n.drawCB) n.drawCB(n, ctx);
-		}
+		if (n.a && n.drawCB) n.drawCB(n, ctx);
 		if (n.a && n.child) {
 			n = n.child;
 		} else {
 			while (n) {
-				if (this.edit) {
-					if (this.highlighted === n) {
-						ctx.strokeStyle = 'white';
-						ctx.strokeRect(-n.w/2, -n.h/2, n.w, n.h);
-						var p = n.parent, i;
-						for (i in n.parent) if (n === p[i]) break;
-						ctx.fillStyle = 'white';
-						ctx.fillText(i+'', -n.w/2+5, n.h/2-5);
-						ctx.rotate(-n.r / 180 * Math.PI);
-						if (this.guide && this.guide.vertical) {
-							ctx.beginPath();
-							ctx.moveTo(-10000, 0);
-							ctx.lineTo(10000, 0);
-							ctx.stroke();
-						}
-						if (this.guide && this.guide.horisontal) {
-							ctx.beginPath();
-							ctx.moveTo(0, -10000);
-							ctx.lineTo(0, 10000);
-							ctx.stroke();
-						}
-					} else {
-						ctx.strokeStyle = 'gray';
-						ctx.strokeRect(-n.w/2, -n.h/2, n.w, n.h);
-					}
-				}
-	
 				ctx.restore();
+				if (n.next) {
+					n = n.next;
+					break;
+				}
+				n = n.parent;
+			}
+		}
+	}
+	
+	n = this.root;
+	while (n) {
+		if (n.a && !n.p && n.updateCB) {
+			try {
+				n.updateCB(n, this);
+			} catch (e) {
+				var p = n.parent, i;
+				for (i in n.parent) if (n === p[i]) break;
+				console.log('Error in "'+i+'" update');
+				console.log(n.updateCB);
+				this.changeEditMode('off');
+			}
+		}
+		if (n.a && !n.p && n.child) {
+			n = n.child;
+		} else {
+			while (n) {
 				if (n.next) {
 					n = n.next;
 					break;
@@ -259,6 +302,8 @@ Tree2d.prototype.init = function(node) {
 	else node.h = parseFloat(node.h);
 	if (node.a == undefined) node.a = 1;
 	else node.a = parseFloat(node.a);
+	if (node.p == undefined) node.p = 0;
+	else node.p = parseFloat(node.p);
 	if (node.id == undefined) node.id = this.genId();
 	this.cookUpdate(node);
 	if (node.initCB) node.initCB(node, this);
@@ -287,6 +332,7 @@ Tree2d.prototype.clean = function(node) {
 	if (node.a == 1) delete node.a;
 	if (node.w == 0) delete node.w;
 	if (node.h == 0) delete node.h;
+	if (node.p == 0) delete node.p;
 	if (node.id) delete node.id;
 	for (var i in node) {
 		if (typeof node[i] === 'number') {
@@ -692,7 +738,7 @@ Tree2d.prototype.click = function(evt) {
 		} else if (event.ctrlKey && evt.button === 2) {
 			this.del(this.clicked);
 			this.highlighted = this.clicked = undefined;
-			this.cycle();
+			this.debugCycle();
 			evt.preventDefault();
 			return;
 		}
@@ -702,7 +748,7 @@ Tree2d.prototype.click = function(evt) {
 		this.tmpr  = this.tmpst.r - Math.atan2(pos.y - this.tmpst.y, pos.x - this.tmpst.x) / Math.PI * 180;
 	
 		if (this.onchange) this.onchange(this.clean(this.copy(this.root, true)));
-		this.cycle();
+		this.debugCycle();
 	
 		if (this.onselect) {
 			var i;
@@ -739,7 +785,7 @@ Tree2d.prototype.drag = function(evt) {
 			this.clicked.y = this.tmpst.y + (pos.y - this.tmpmp.y);
 			this.alignObject(this.clicked);
 		}
-		this.cycle();
+		this.debugCycle();
 	}
 	evt.preventDefault();
 };
@@ -760,7 +806,7 @@ Tree2d.prototype.release = function(evt) {
 			}
 			this.onselect(i);
 		}
-		this.cycle();
+		this.debugCycle();
 	}
 };
 
@@ -780,7 +826,7 @@ Tree2d.prototype.logJSON = function() {
 Tree2d.prototype.highlight = function(n) {
 	if (this.edit) {
 		this.highlighted = n;
-		this.cycle();
+		this.debugCycle();
 	}
 };
 
@@ -870,14 +916,14 @@ Tree2d.prototype.loadImg = function(f) {
 		loadQueue--;
 		if (loadQueue < 0 && self instanceof Tree2d) {
 			self.init(self.clean(self.root));
-			self.cycle();
+			self.debugCycle();
 		}
 	}
 	reader.onerror = reader.onabort = function() {
 		loadQueue--;
 		if (loadQueue < 0 && self instanceof Tree2d) {
 			self.init(self.clean(self.root));
-			self.cycle();
+			self.debugCycle();
 		}
 	}
 	var result = reader.readAsDataURL(f);
@@ -903,6 +949,7 @@ Tree2d.prototype.makeFunction = function(node, line) {
 	var alphanumetric = /^[a-z][a-z0-9]+$/i;
 	var numetric = /^[0-9]+$/;
 	var noan = /^\W$/;
+	var toFind = {};
 	line = line.split('\n').join(';');
 	line = line.split('#').join('ROOT');
 
@@ -910,19 +957,6 @@ Tree2d.prototype.makeFunction = function(node, line) {
 	for (var k in arr) {
 		var next = arr[parseFloat(k)+1];
 		var prev = arr[parseFloat(k)-1];
-
-		if (arr[k].charAt(0) == '_') {
-			arr[k] = arr[k].substr(1);
-			/*var n = this.findByName(arr[k]);
-			if (!n) {
-				var text = 'Unknown node name "'+arr[k]+'" at line "'+line+'"';
-				if (node.name) text = 'In node "'+node.name+'": '+text;
-				if (this.run) alert (text);
-				return '';
-			}*/
-			arr[k] = 't.findByName("'+arr[k]+'", t.root)';
-			continue;
-		}
 
 		if (prev && prev == '.') continue;
 
@@ -951,23 +985,22 @@ Tree2d.prototype.makeFunction = function(node, line) {
 		}
 
 		if (alphanumetric.test(arr[k]) && !flag) {
-			var text = 'Unknown identifier "'+arr[k]+'" at line "'+line+'"';
-			if (node.name) text = 'In node "'+node.name+'": '+text;
-			if (this.run) alert (text);
-			return '';
+			toFind[arr[k]] = true;
 		}
 	}
 	line = arr.join('').split(';').join('\n');
+	
+	for (var i in toFind) {
+		line = 'var '+i+' = t.findByName("'+i+'", t.root)\n' + line;
+	}
 
 	try {
 		eval('(function(n,t){'+line+'})');
 	} catch (e) {
 		var text = 'Error in "'+line+'": ' + e;
 		if (node.name) text = 'In node "'+node.name+'": '+text;
-		if (this.run) alert (text);
-		return '';
+		throw new Error(text);
 	}
-	line = line.split('ROOT').join('#');
 
 	return line;
 };
