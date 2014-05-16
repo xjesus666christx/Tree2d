@@ -90,6 +90,8 @@ Tree2d.prototype.changeEditMode = function(edit) {
 		this.edit = false;
 		this.backup = this.root;
 		this.root = this.copy(this.backup, true); // для ф-ии reset
+		this.root.x = this.root.y = 0;
+		this.root.zx = this.root.zy = 1;
 		this.init(this.root);
 		this.run = setInterval(
 			(function(self) {
@@ -732,30 +734,33 @@ Tree2d.prototype.click = function(evt) {
 	this.highlighted = this.clicked = this.getClickedObject(pos);
 	this.mousedown = pos;
 	
-	if (this.edit && this.clicked && this.clicked.parent) {
-		if (event.ctrlKey && evt.button === 0) {
-			this.highlighted = this.clicked = this.add(this.clicked.parent, this.clicked);
-		} else if (event.ctrlKey && evt.button === 2) {
-			this.del(this.clicked);
+	if (this.edit) {
+		if (evt.button === 2) {
+			if (event.altKey && this.clicked && this.clicked.parent) this.del(this.clicked);
+			else this.tmpoffset = {x: this.root.x - pos.x, y: this.root.y - pos.y};
 			this.highlighted = this.clicked = undefined;
 			this.debugCycle();
 			evt.preventDefault();
 			return;
-		}
-	
-		this.tmpmp = this.convertPointToNodeTransform(this.clicked.parent, pos);
-		this.tmpst = {x: this.clicked.x, y: this.clicked.y, r: this.clicked.r, zx: this.clicked.zx, zy:this.clicked.zy};
-		this.tmpr  = this.tmpst.r - Math.atan2(pos.y - this.tmpst.y, pos.x - this.tmpst.x) / Math.PI * 180;
-	
-		if (this.onchange) this.onchange(this.clean(this.copy(this.root, true)));
-		this.debugCycle();
-	
-		if (this.onselect) {
-			var i;
-			for (i in this.highlighted.parent) {
-				if (this.highlighted.parent[i] === this.highlighted) break;
+		} else if (this.clicked && this.clicked.parent) {
+			if (event.ctrlKey && evt.button === 0) {
+				this.highlighted = this.clicked = this.add(this.clicked.parent, this.clicked);
 			}
-			this.onselect(i);
+
+			this.tmpmp = this.convertPointToNodeTransform(this.clicked.parent, pos);
+			this.tmpst = {x: this.clicked.x, y: this.clicked.y, r: this.clicked.r, zx: this.clicked.zx, zy:this.clicked.zy};
+			this.tmpr  = this.tmpst.r - Math.atan2(pos.y - this.tmpst.y, pos.x - this.tmpst.x) / Math.PI * 180;
+
+			if (this.onchange) this.onchange(this.clean(this.copy(this.root, true)));
+			this.debugCycle();
+
+			if (this.onselect) {
+				var i;
+				for (i in this.highlighted.parent) {
+					if (this.highlighted.parent[i] === this.highlighted) break;
+				}
+				this.onselect(i);
+			}
 		}
 	}
 };
@@ -765,25 +770,30 @@ Tree2d.prototype.drag = function(evt) {
 	var pos = this.getMousePos(this.canvas, evt);
 	this.mousemove = pos;
 	
-	if (this.edit && this.clicked && this.clicked.parent) {
-		pos = this.convertPointToNodeTransform(this.clicked.parent, pos);
-	
+	if (this.edit) {
 		if (evt.button === 2) {
-			var dx1 = this.tmpmp.x - this.tmpst.x;
-			var dy1 = this.tmpmp.y - this.tmpst.y;
-			var d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
-			var dx2 = pos.x - this.tmpst.x;
-			var dy2 = pos.y - this.tmpst.y;
-			var d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-			var d = d2 / d1;
-			this.clicked.zx = this.tmpst.zx * d;
-			this.clicked.zy = this.tmpst.zy * d;
-			var r = Math.atan2(pos.y - this.tmpst.y, pos.x - this.tmpst.x) / Math.PI * 180;
-			this.clicked.r = r + this.tmpr;
-		} else {
-			this.clicked.x = this.tmpst.x + (pos.x - this.tmpmp.x);
-			this.clicked.y = this.tmpst.y + (pos.y - this.tmpmp.y);
-			this.alignObject(this.clicked);
+			this.root.x = pos.x + this.tmpoffset.x;
+			this.root.y = pos.y + this.tmpoffset.y;
+		} else if (this.clicked && this.clicked.parent) {
+			pos = this.convertPointToNodeTransform(this.clicked.parent, pos);
+
+			if (event.altKey) {
+				var dx1 = this.tmpmp.x - this.tmpst.x;
+				var dy1 = this.tmpmp.y - this.tmpst.y;
+				var d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+				var dx2 = pos.x - this.tmpst.x;
+				var dy2 = pos.y - this.tmpst.y;
+				var d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+				var d = d2 / d1;
+				this.clicked.zx = this.tmpst.zx * d;
+				this.clicked.zy = this.tmpst.zy * d;
+				var r = Math.atan2(pos.y - this.tmpst.y, pos.x - this.tmpst.x) / Math.PI * 180;
+				this.clicked.r = r + this.tmpr;
+			} else {
+				this.clicked.x = this.tmpst.x + (pos.x - this.tmpmp.x);
+				this.clicked.y = this.tmpst.y + (pos.y - this.tmpmp.y);
+				this.alignObject(this.clicked);
+			}
 		}
 		this.debugCycle();
 	}
