@@ -23,7 +23,7 @@ function Tree2d(container, root) {
 			end: ''
 		},
 		click: {
-			begin: '\nif (t.clicked === n) {\n',
+			begin: '\nif (t.clicked === n || (t.keys && t.keys[n.key])) {\n',
 			end: '\nt.clicked=undefined;}'
 		}
 	};
@@ -37,6 +37,7 @@ function Tree2d(container, root) {
 	this.edit = true;
 	
 	var self = this;
+	document.addEventListener('keydown', function(evt) {self.keydown(evt)}, false);
 	this.canvas.addEventListener('mousedown', function(evt) {self.click(evt)}, false);
 	this.canvas.addEventListener('mousemove', function(evt) {self.drag(evt)}, false);
 	this.canvas.addEventListener('mouseup',   function(evt) {self.release(evt)}, false);
@@ -171,6 +172,7 @@ Tree2d.prototype.debugCycle = function() {
 	this.mousedown = undefined;
 	this.mousemove = undefined;
 	this.mouseup = undefined;
+	this.keys = undefined;
 };
 
 // действия за 1 кадр: отрисовка и апдейт
@@ -235,6 +237,7 @@ Tree2d.prototype.cycle = function() {
 	this.mousedown = undefined;
 	this.mousemove = undefined;
 	this.mouseup = undefined;
+	this.keys = undefined;
 };
 
 // генерирует уникальный айдишник - имя узла
@@ -726,6 +729,12 @@ Tree2d.prototype.alignObject = function(n, minh, minv) {
 	else if (guide.boundbottom) n.y = guide.boundbottom.y + guide.boundbottom.h / 2 + n.h / 2;
 	
 	this.guide = guide;
+};
+
+Tree2d.prototype.keydown = function(evt) {
+	var key = evt.keyCode || event.which;
+	this.keys = this.keys || {};
+	this.keys[key] = true;
 };
 
 // обработчик клика
