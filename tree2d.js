@@ -1,6 +1,6 @@
 (function() {
 
-function Tree2d(container, root) {
+function Tree2d(container, root, editorContainer) {
 	if (!(this instanceof Tree2d)) {
 		throw new Error('Tree2d constructor called without "new".');
 	}
@@ -33,50 +33,21 @@ function Tree2d(container, root) {
 	this.ctx = container.getContext("2d");
 	this.ctx.fillStyle = 'black';
 	this.ctx.font = "bold 20px Arial";
-	//this.ctx.lineWidth = 2;
-	this.edit = true;
 	
-	var self = this;
-	this.canvas.addEventListener('mousedown', function(evt) {self.click(evt)}, false);
-	this.canvas.addEventListener('mousemove', function(evt) {self.drag(evt)}, false);
-	this.canvas.addEventListener('mouseup',   function(evt) {self.release(evt)}, false);
-	this.canvas.addEventListener('mouseout',  function(evt) {self.release(evt)}, false);
-	this.canvas.addEventListener('touchstart', function(evt) {self.click(evt)}, false);
-	this.canvas.addEventListener('touchmove', function(evt) {self.drag(evt)}, false);
-	this.canvas.addEventListener('touchend',   function(evt) {self.release(evt)}, false);
-	this.canvas.addEventListener('touchleave',   function(evt) {self.release(evt)}, false);
-	this.canvas.addEventListener('touchcancel',   function(evt) {self.release(evt)}, false);
+	if (typeof root === 'string') root = JSON.parse(root);
+	this.root = root;
+	this.init(root);
+	this.canvas.width = root.w;
+	this.canvas.height = root.h;
 	
-	root = root || { // корневой узел
-		x:0,  // позиция по Х
-		y:0,  // позиция по Y
-		r:0,  // поворот в градусах
-		zx:1, // масштаб по горизонтали (1 - изначальный, 0.5 - в 2 раза меньше)
-		zy:1, // масштаб по вертикали
-		w:512, // ширина (прилаги)
-		h:512, // высота (прилаги)
-		a:1,  // степень непрозрачности (1 - непрозрачный, 0 - полностью прозрачный)
-		id:0, // уникальный ID, по нему осуществляется поиск
-	};
-	
-	this.set(root);
+	if (editorContainer) {
+		this.createEditorFeatures(editorContainer);
+	}
 };
 
 Tree2d.prototype.images = {};
 
-// устанавливает корень прилаги
-Tree2d.prototype.set = function(json) {
-	if (this.edit) {
-		if (typeof json === 'string') json = JSON.parse(json);
-		this.root = json;
-		this.init(json);
-		this.canvas.width = json.w;
-		this.canvas.height = json.h;
-		this.debugCycle();
-	}
-};
-
-// переключает режим работы движка (редактирование/игра)
+/*// переключает режим работы движка (редактирование/игра)
 Tree2d.prototype.changeEditMode = function(edit) {
 	if (edit === true || edit === 'on') {
 		this.edit = true;
@@ -106,72 +77,7 @@ Tree2d.prototype.changeEditMode = function(edit) {
 	}
 	//console.log(this);
 	return this.edit;
-}
-
-// действия за 1 кадр: отрисовка и апдейт (с учетом редактора)
-Tree2d.prototype.debugCycle = function() {
-	var n = this.root;
-	var ctx = this.ctx;
-	
-	ctx.save();
-	ctx.fillRect(0, 0, this.root.w, this.root.h);
-	ctx.translate(this.root.w / 2, this.root.h / 2);
-	
-	while (n) {
-		ctx.save();
-		ctx.globalAlpha *= n.a;
-		ctx.translate(n.x, n.y);
-		ctx.rotate(n.r / 180 * Math.PI);
-		ctx.scale(n.zx, n.zy);
-	
-		if (n.a) {
-			if (n.drawCB) n.drawCB(n, ctx);
-		}
-		if (n.a && n.child) {
-			n = n.child;
-		} else {
-			while (n) {
-				if (this.highlighted === n) {
-					ctx.strokeStyle = 'white';
-					ctx.strokeRect(-n.w/2, -n.h/2, n.w, n.h);
-					var p = n.parent, i;
-					for (i in n.parent) if (n === p[i]) break;
-					ctx.fillStyle = 'white';
-					ctx.fillText(i+'', -n.w/2+5, n.h/2-5);
-					ctx.rotate(-n.r / 180 * Math.PI);
-					if (this.guide && this.guide.vertical) {
-						ctx.beginPath();
-						ctx.moveTo(-10000, 0);
-						ctx.lineTo(10000, 0);
-						ctx.stroke();
-					}
-					if (this.guide && this.guide.horisontal) {
-						ctx.beginPath();
-						ctx.moveTo(0, -10000);
-						ctx.lineTo(0, 10000);
-						ctx.stroke();
-					}
-				} else {
-					ctx.strokeStyle = 'gray';
-					ctx.strokeRect(-n.w/2, -n.h/2, n.w, n.h);
-				}
-	
-				ctx.restore();
-				if (n.next) {
-					n = n.next;
-					break;
-				}
-				n = n.parent;
-			}
-		}
-	}
-	
-	ctx.restore();
-	
-	this.mousedown = undefined;
-	this.mousemove = undefined;
-	this.mouseup = undefined;
-};
+}*/
 
 // действия за 1 кадр: отрисовка и апдейт
 Tree2d.prototype.cycle = function() {
@@ -206,7 +112,7 @@ Tree2d.prototype.cycle = function() {
 	
 	n = this.root;
 	while (n) {
-		if (n.a && !n.p && n.updateCB) {
+		if (n.a && n.a < 1 && n.updateCB) {
 			try {
 				n.updateCB(n, this);
 			} catch (e) {
@@ -217,7 +123,7 @@ Tree2d.prototype.cycle = function() {
 				this.changeEditMode('off');
 			}
 		}
-		if (n.a && !n.p && n.child) {
+		if (n.a && n.a < 1 && n.child) {
 			n = n.child;
 		} else {
 			while (n) {
@@ -304,8 +210,6 @@ Tree2d.prototype.init = function(node) {
 	else node.h = parseFloat(node.h);
 	if (node.a == undefined) node.a = 1;
 	else node.a = parseFloat(node.a);
-	if (node.p == undefined) node.p = 0;
-	else node.p = parseFloat(node.p);
 	if (node.id == undefined) node.id = this.genId();
 	this.cookUpdate(node);
 	if (node.initCB) node.initCB(node, this);
@@ -334,7 +238,6 @@ Tree2d.prototype.clean = function(node) {
 	if (node.a == 1) delete node.a;
 	if (node.w == 0) delete node.w;
 	if (node.h == 0) delete node.h;
-	if (node.p == 0) delete node.p;
 	if (node.id) delete node.id;
 	for (var i in node) {
 		if (typeof node[i] === 'number') {
@@ -352,18 +255,24 @@ Tree2d.prototype.clean = function(node) {
 // добавляет node в родителя
 // перестраивает ссылки на следующий элемент среди потомков parent
 // инициализирует node
-Tree2d.prototype.add = function(parent, node) {
-	var name, ename;
-	for (var i in node.parent) {
-		if (node.parent[i] === node) {
-			ename = i;
-			ename = ename.replace(/[0-9]+$/, '');
-			break;
+Tree2d.prototype.add = function(parent, node, ename) {
+	var name;
+	if (!ename && node.parent) {
+		for (var i in node.parent) {
+			if (node.parent[i] === node) {
+				ename = i;
+				ename = ename.replace(/[0-9]+$/, '');
+				break;
+			}
 		}
 	}
-	for (var j = 0; j < 99999; j++) {
-		name = ename + j;
-		if (parent[name] === undefined) break;
+	if (parent[ename]) {
+		for (var j = 0; j < 99999; j++) {
+			name = ename + j;
+			if (parent[name] === undefined) break;
+		}
+	} else {
+		name = ename;
 	}
 	
 	node = this.copy(node);
@@ -728,98 +637,6 @@ Tree2d.prototype.alignObject = function(n, minh, minv) {
 	this.guide = guide;
 };
 
-// обработчик клика
-Tree2d.prototype.click = function(evt) {
-	var pos = this.getMousePos(this.canvas, evt);
-	this.highlighted = this.clicked = this.getClickedObject(pos);
-	this.mousedown = pos;
-	
-	if (this.edit) {
-		if (evt.button === 2) {
-			if (event.altKey && this.clicked && this.clicked.parent) this.del(this.clicked);
-			else this.tmpoffset = {x: this.root.x - pos.x, y: this.root.y - pos.y};
-			this.highlighted = this.clicked = undefined;
-			this.debugCycle();
-			evt.preventDefault();
-			return;
-		} else if (this.clicked && this.clicked.parent) {
-			if (event.ctrlKey && evt.button === 0) {
-				this.highlighted = this.clicked = this.add(this.clicked.parent, this.clicked);
-			}
-
-			this.tmpmp = this.convertPointToNodeTransform(this.clicked.parent, pos);
-			this.tmpst = {x: this.clicked.x, y: this.clicked.y, r: this.clicked.r, zx: this.clicked.zx, zy:this.clicked.zy};
-			this.tmpr  = this.tmpst.r - Math.atan2(pos.y - this.tmpst.y, pos.x - this.tmpst.x) / Math.PI * 180;
-
-			if (this.onchange) this.onchange(this.clean(this.copy(this.root, true)));
-			this.debugCycle();
-
-			if (this.onselect) {
-				var i;
-				for (i in this.highlighted.parent) {
-					if (this.highlighted.parent[i] === this.highlighted) break;
-				}
-				this.onselect(i);
-			}
-		}
-	}
-};
-
-// движение мыши с нажатием
-Tree2d.prototype.drag = function(evt) {
-	var pos = this.getMousePos(this.canvas, evt);
-	this.mousemove = pos;
-	
-	if (this.edit) {
-		if (evt.button === 2) {
-			this.root.x = pos.x + this.tmpoffset.x;
-			this.root.y = pos.y + this.tmpoffset.y;
-		} else if (this.clicked && this.clicked.parent) {
-			pos = this.convertPointToNodeTransform(this.clicked.parent, pos);
-
-			if (event.altKey) {
-				var dx1 = this.tmpmp.x - this.tmpst.x;
-				var dy1 = this.tmpmp.y - this.tmpst.y;
-				var d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
-				var dx2 = pos.x - this.tmpst.x;
-				var dy2 = pos.y - this.tmpst.y;
-				var d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-				var d = d2 / d1;
-				this.clicked.zx = this.tmpst.zx * d;
-				this.clicked.zy = this.tmpst.zy * d;
-				var r = Math.atan2(pos.y - this.tmpst.y, pos.x - this.tmpst.x) / Math.PI * 180;
-				this.clicked.r = r + this.tmpr;
-			} else {
-				this.clicked.x = this.tmpst.x + (pos.x - this.tmpmp.x);
-				this.clicked.y = this.tmpst.y + (pos.y - this.tmpmp.y);
-				this.alignObject(this.clicked);
-			}
-		}
-		this.debugCycle();
-	}
-	evt.preventDefault();
-};
-
-// отпускание мыши
-Tree2d.prototype.release = function(evt) {
-	var pos = this.getMousePos(this.canvas, evt);
-	this.mouseup = pos;
-	this.clicked = undefined;
-	
-	if (this.edit && this.highlighted) {
-		this.guide = undefined;
-		if (this.onchange) this.onchange(this.clean(this.copy(this.root, true)));
-		if (this.onselect) {
-			var i;
-			for (i in this.highlighted.parent) {
-				if (this.highlighted.parent[i] === this.highlighted) break;
-			}
-			this.onselect(i);
-		}
-		this.debugCycle();
-	}
-};
-
 // генерирует JSON - структуру того, что в редакторе, и выводит в лог
 Tree2d.prototype.logJSON = function() {
 	if (this instanceof Tree2d) {
@@ -829,14 +646,6 @@ Tree2d.prototype.logJSON = function() {
 		console.log(json);
 	} else {
 		throw new Error('no root');
-	}
-};
-
-// устанавливает выделение на объект n
-Tree2d.prototype.highlight = function(n) {
-	if (this.edit) {
-		this.highlighted = n;
-		this.debugCycle();
 	}
 };
 
@@ -937,7 +746,7 @@ Tree2d.prototype.loadImg = function(f) {
 		}
 	}
 	var result = reader.readAsDataURL(f);
-}
+};
 
 // грузит кучу картинок из массива файлов files
 Tree2d.prototype.loadImages = function(files) {
@@ -1065,6 +874,664 @@ Tree2d.prototype.boxCollision = function(n) {
 	return flag;
 };
 
+Tree2d.prototype.getName = function(obj) {
+	if (obj.parent) {
+		for (var i in obj.parent) {
+			if (obj.parent[i] === obj) {
+				return i;
+			}
+		}
+	} else {
+		if (obj === this.root) {
+			return 'root';
+		} else {
+			return 'NONAME';
+		}
+	}
+};
+
+Tree2d.prototype.createEditorFeatures = function(container) {
+	var self = this;
+	
+	var topBar = document.createElement('div');
+	topBar.style.background = '#def';
+	//topBar.style.height = '19px';
+	topBar.align = 'left';
+	topBar.style.width = '100%';
+	container.appendChild(topBar);
+	
+	var enabled = document.createElement('input');
+	enabled.type = 'checkbox';
+	enabled.style.float = 'left';
+	topBar.appendChild(enabled);
+	
+	var hierarhy = document.createElement('select');
+	hierarhy.id = 'hierarhy';
+	hierarhy.style.position = 'absolute';
+	hierarhy.style.opacity = 0.001;
+	topBar.appendChild(hierarhy);
+	
+	var label = document.createElement('div');
+	label.innerHTML = 'root:';
+	label.style.marginLeft = '2px';
+	topBar.appendChild(label);
+	topBar.height = label.height;
+	
+	var info = document.createElement('div');
+	info.style.background = '#eef';
+	info.style.width = '99%';
+	info.style.height = '400px';
+	info.style.overflow = 'scroll';
+	info.align = 'left';
+	container.appendChild(info);
+	
+	var runBtn = document.createElement('input');
+	runBtn.type = 'button';
+	runBtn.value = 'RUN';
+	runBtn.onclick = function(){self.testRun()};
+	container.appendChild(runBtn);
+	
+	hierarhy.onchange = function() {
+		label.innerHTML = this.value + ':';
+		
+		var arr = this.value.split('.'), n = self;
+		for (var i = 0; i < arr.length; i++) {
+			n = n[arr[i]];
+		}
+		
+		self.highlighted = n;
+		self.onchange();
+	}
+	
+	this.testRun = function() {
+		var text = JSON.stringify(this.clean(this.copy(this.root)));
+		var tab = window.open('', 'myconsole', 'width=350,height=250,menubar=0,toolbar=1,status=0,scrollbars=1,resizable=1');
+		tab.document.writeln(
+			'<html><head><title>Tree2d: Test Run</title><script type="text/javascript" src="tree2d.js"></script></head>'
+			+'<body bgcolor=white onLoad="self.focus()">'
+			+'<canvas id="mycanvas"></canvas>'
+			+"<script>txt = '"+text
+			+"';new Tree2d(document.getElementById('mycanvas'), txt)</script>"
+			+'</body></html>'
+		);
+		tab.document.close();
+	};
+	
+	this.updateHierarhy = function() {
+		while (hierarhy.firstChild) {
+			hierarhy.removeChild(hierarhy.firstChild);
+		}
+		
+		var n = this.root, d = 0, arr = [];
+		while (n) {
+			arr.push(this.getName(n));
+			var option = document.createElement("option");
+			option.value = arr.join('.');
+			if (n === this.highlighted) {
+				label.innerHTML = arr.join('.') + ':';
+			}
+			option.text = '';
+			for (var i = 0; i < d; i++) option.text += '____';
+			option.text += arr[d];
+			hierarhy.appendChild(option);
+			d++;
+			
+			if (n.child) {
+				n = n.child;
+			} else {
+				while (n) {
+					arr.pop();
+					d--;
+					if (n.next) {
+						n = n.next;
+						break;
+					}
+					n = n.parent;
+				}
+			}
+		}
+	};
+	
+	this.editParam = function(name, val) {
+		var n = this.highlighted;
+		if (!n) n = this.root;//return;
+		if (typeof n[name] === 'number') {
+			if (parseFloat(val) !== undefined) {
+				n[name] = parseFloat(val);
+				this.debugCycle();
+			}
+		} else {
+			n[name] = val;
+			this.debugCycle();
+		}
+	};
+	
+	this.deleteParam = function(i) {
+		var n = this.highlighted;
+		if (!n) n = this.root;//return;
+		n[i] = undefined;
+		delete n[i];
+		this.updateInfo();
+	};
+	
+	this.selectByPath = function(i) {
+		var n = self.highlighted;
+		if (!n) n = self.root;//return;
+		
+		var arr = i.split('.');
+		for (var i = 0; i < arr.length; i++) {
+			n = n[arr[i]];
+		}
+		
+		self.highlighted = n;
+		self.onchange();
+	};
+	
+	this.addParam = function(name, type) {
+		var n = self.highlighted;
+		if (!n) n = self.root;
+		
+		if (!type || type === 'Number') {
+			if (n[name]) return;
+			n[name] = 0;
+		} else if (type === 'String') {
+			if (n[name]) return;
+			n[name] = 'Some string';
+		} else if (type === 'Object') {
+			self.add(n, {x:0,y:0,r:0,zx:1,zy:1,a:1}, name);
+		}
+		self.updateInfo();
+	};
+	
+	function expandName(name) {
+		var n = '';
+		for (var i = 0; i < name.length; i++) {
+			if (name.charAt(i) === '_') {
+				if (i > 0) {
+					n += ' ';
+					i++;
+					n += name.charAt(i).toUpperCase();
+				}
+			} else {
+				if (name.charAt(i) === name.charAt(i).toUpperCase()) n += ' ';
+				n += name.charAt(i);
+			}
+		}
+		n = n.charAt(0).toUpperCase() + n.substr(1);
+		return n;
+	}
+	
+	this.updateInfo = function() {
+		while (info.firstChild) {
+			info.removeChild(info.firstChild);
+		}
+		var n = this.highlighted, j = 1;
+		if (!n) n = this.root;//return;
+		
+		enabled.checked = n.a > 0 ? true : false;
+		
+		var keys = document.createElement('div');
+		keys.style.float = 'left';
+		keys.style.width = '20%';
+		keys.style.minWidth = '50px';
+		info.appendChild(keys);
+		var values = document.createElement('div');
+		values.style.float = 'left';
+		values.style.width = '80%';
+		info.appendChild(values);
+		
+		var pos = document.createElement('div');
+		pos.style.width = '100%';
+		pos.innerHTML = 'Position';
+		keys.appendChild(pos);
+		var bounds = document.createElement('div');
+		bounds.style.width = '100%';
+		bounds.style.background = '#def';
+		bounds.innerHTML = 'Bounds';
+		keys.appendChild(bounds);
+		var scale = document.createElement('div');
+		scale.style.width = '100%';
+		scale.innerHTML = 'Scale';
+		keys.appendChild(scale);
+		var rot = document.createElement('div');
+		rot.style.width = '100%';
+		rot.style.background = '#def';
+		rot.innerHTML = 'Rotation';
+		keys.appendChild(rot);
+		var alpha = document.createElement('div');
+		alpha.style.width = '100%';
+		alpha.innerHTML = 'Opacity';
+		keys.appendChild(alpha);
+		
+		var X = document.createElement('input');
+		X.type = 'number';
+		X.value = n.x;
+		X.onchange = function(){self.editParam('x', this.value)};
+		X.className = 'DoubleNumber';
+		values.appendChild(X);
+		var Y = document.createElement('input');
+		Y.type = 'number';
+		Y.value = n.y;
+		Y.onchange = function(){self.editParam('y', this.value)};
+		Y.className = 'DoubleNumber';
+		values.appendChild(Y);
+		var W = document.createElement('input');
+		W.type = 'number';
+		W.value = n.w;
+		W.onchange = function(){self.editParam('w', this.value)};
+		W.className = 'DoubleNumber';
+		values.appendChild(W);
+		var H = document.createElement('input');
+		H.type = 'number';
+		H.value = n.h;
+		H.onchange = function(){self.editParam('h', this.value)};
+		H.className = 'DoubleNumber';
+		values.appendChild(H);
+		var ZX = document.createElement('input');
+		ZX.type = 'number';
+		ZX.value = n.zx;
+		ZX.onchange = function(){self.editParam('zx', this.value)};
+		ZX.className = 'DoubleNumber';
+		values.appendChild(ZX);
+		var ZY = document.createElement('input');
+		ZY.type = 'number';
+		ZY.value = n.zy;
+		ZY.onchange = function(){self.editParam('zy', this.value)};
+		ZY.className = 'DoubleNumber';
+		values.appendChild(ZY);
+		var R = document.createElement('input');
+		R.type = 'number';
+		R.value = n.r;
+		R.onchange = function(){self.editParam('r', this.value)};
+		R.className = 'Number';
+		values.appendChild(R);
+		var A = document.createElement('input');
+		A.type = 'number';
+		A.className = 'DoubleNumber';
+		values.appendChild(A);
+		var AR = document.createElement('input');
+		AR.type = 'range';
+		AR.min = 0;
+		AR.max = 1;
+		AR.step = 0.02;
+		AR.value = 1;
+		AR.className = 'DoubleRange';
+		values.appendChild(AR);
+		A.value = AR.value = n.a;
+		A.onchange = function(){self.editParam('a', this.value); AR.value = this.value; enabled.checked = n.a > 0 ? true : false};
+		AR.oninput = function(){self.editParam('a', this.value); A.value = this.value; enabled.checked = n.a > 0 ? true : false};
+		enabled.onchange = function(){n.a = A.value = AR.value = this.checked ? 1 : 0; self.debugCycle()};
+		
+		for (var i in n) {
+			if (i === 'x' || i === 'y' || i === 'r' || i === 'zx' || i === 'zy' || i === 'a' || i === 'w' || i === 'h' || i === 'id' || i === 'next' || i === 'child') {
+			} else if (typeof n[i] === 'number') {
+				var key = document.createElement('div');
+				key.style.width = '100%';
+				key.style.whiteSpace = 'nowrap';
+				if (j++ % 2) key.style.background = '#def';
+				key.innerHTML = expandName(i);
+				keys.appendChild(key);
+				var val = document.createElement('input');
+				val.type = 'number';
+				val.value = n[i];
+				val.onchange = function(){self.editParam(i, this.value)};
+				val.className = 'Number';
+				val.style.width = '90%';
+				values.appendChild(val);
+				var delBtn = document.createElement('input');
+				delBtn.type = 'button';
+				delBtn.value = '-';
+				delBtn.id = i;
+				delBtn.style.width = '9%';
+				delBtn.onclick = function(){self.deleteParam(this.id)};
+				values.appendChild(delBtn);
+			} else if (typeof n[i] === 'string') {
+				var key = document.createElement('div');
+				key.style.width = '100%';
+				key.style.whiteSpace = 'nowrap';
+				if (j++ % 2) key.style.background = '#def';
+				key.innerHTML = expandName(i);
+				keys.appendChild(key);
+				var val = document.createElement('input');
+				val.type = 'text';
+				val.spellCheck = false;
+				val.style.width = '90%';
+				val.value = n[i];
+				val.onchange = function(){self.editParam(i, this.value)};
+				val.className = 'String';
+				values.appendChild(val);
+				var delBtn = document.createElement('input');
+				delBtn.type = 'button';
+				delBtn.value = '-';
+				delBtn.id = i;
+				delBtn.style.width = '9%';
+				delBtn.onclick = function(){self.deleteParam(this.id)};
+				values.appendChild(delBtn);
+			}
+		}
+		for (var i in n) {
+			if (i === 'x' || i === 'y' || i === 'r' || i === 'zx' || i === 'zy' || i === 'a' || i === 'w' || i === 'h' || i === 'id' || i === 'next' || i === 'child') {
+			} else if (typeof n[i] === 'object') {
+				var name = i;
+				if (i === 'parent') {
+					name = this.getName(n.parent);
+				} else {
+					name = i;
+				}
+				
+				var key = document.createElement('div');
+				key.style.width = '100%';
+				key.style.whiteSpace = 'nowrap';
+				if (j++ % 2) key.style.background = '#def';
+				key.innerHTML = expandName(i);
+				keys.appendChild(key);
+				var selectBtn = document.createElement('input');
+				selectBtn.type = 'button';
+				selectBtn.value = name + ' (object)';
+				selectBtn.id = i;
+				selectBtn.style.width = '90%';
+				selectBtn.onclick = function(){self.selectByPath(this.id)};
+				values.appendChild(selectBtn);
+				var delBtn = document.createElement('input');
+				delBtn.type = 'button';
+				delBtn.value = '-';
+				delBtn.id = i;
+				delBtn.style.width = '9%';
+				delBtn.onclick = function(){self.deleteParam(this.id)};
+				values.appendChild(delBtn);
+			}
+		}
+		
+		var addLabel = document.createElement('select');
+		addLabel.style.width = '100%';
+		if (j++ % 2 == 0) addLabel.style.background = '#eef';
+		keys.appendChild(addLabel);
+		var types = ['Number', 'String', 'Object'];
+		for (var i in types) {
+			var option = document.createElement("option");
+			option.value = option.text = types[i];
+			addLabel.appendChild(option);
+		}
+		
+		var name = document.createElement('input');
+		name.type = 'text';
+		name.spellCheck = false;
+		name.style.width = '90%';
+		name.placeholder = 'field name';
+		name.className = 'String';
+		name.onkeydown = function(){if (event.keyCode == 13) document.getElementById('addBtn').click()};
+		values.appendChild(name);
+		var addBtn = document.createElement('input');
+		addBtn.type = 'button';
+		addBtn.id = 'addBtn';
+		addBtn.value = '+';
+		addBtn.style.width = '9%';
+		addBtn.onclick = function(){self.addParam(name.value, addLabel.value)};
+		values.appendChild(addBtn);
+	}
+	
+	this.debugCycle = function() {
+		var n = this.root;
+		var ctx = this.ctx;
+
+		ctx.save();
+		ctx.fillRect(0, 0, this.root.w, this.root.h);
+		ctx.translate(this.root.w / 2, this.root.h / 2);
+
+		while (n) {
+			ctx.save();
+			ctx.globalAlpha *= n.a;
+			ctx.translate(n.x, n.y);
+			ctx.rotate(n.r / 180 * Math.PI);
+			ctx.scale(n.zx, n.zy);
+
+			if (n.a) {
+				if (n.drawCB) n.drawCB(n, ctx);
+			}
+			if (n.a && n.child) {
+				n = n.child;
+			} else {
+				while (n) {
+					if (this.highlighted === n) {
+						ctx.strokeStyle = 'white';
+						ctx.strokeRect(-n.w/2, -n.h/2, n.w, n.h);
+						var p = n.parent, i;
+						for (i in n.parent) if (n === p[i]) break;
+						ctx.fillStyle = 'white';
+						ctx.fillText(i+'', -n.w/2+5, n.h/2-5);
+						ctx.rotate(-n.r / 180 * Math.PI);
+						if (this.guide && this.guide.vertical) {
+							ctx.beginPath();
+							ctx.moveTo(-10000, 0);
+							ctx.lineTo(10000, 0);
+							ctx.stroke();
+						}
+						if (this.guide && this.guide.horisontal) {
+							ctx.beginPath();
+							ctx.moveTo(0, -10000);
+							ctx.lineTo(0, 10000);
+							ctx.stroke();
+						}
+					} else {
+						ctx.strokeStyle = 'gray';
+						ctx.strokeRect(-n.w/2, -n.h/2, n.w, n.h);
+					}
+
+					ctx.restore();
+					if (n.next) {
+						n = n.next;
+						break;
+					}
+					n = n.parent;
+				}
+			}
+		}
+
+		ctx.restore();
+
+		this.mousedown = undefined;
+		this.mousemove = undefined;
+		this.mouseup = undefined;
+	};
+	
+	this.onchange = function(obj) {
+		this.updateHierarhy();
+		this.updateInfo();
+		this.debugCycle();
+	}
+	
+	// обработчик клика
+	this.click = function(evt) {
+		var pos = this.getMousePos(this.canvas, evt);
+		this.highlighted = this.clicked = this.getClickedObject(pos);
+		this.mousedown = pos;
+		
+		if (evt.button === 2) {
+			if (event.altKey && this.clicked && this.clicked.parent) this.del(this.clicked);
+			else this.tmpoffset = {x: this.root.x - pos.x, y: this.root.y - pos.y};
+			this.highlighted = this.clicked = undefined;
+			this.debugCycle();
+			evt.preventDefault();
+			return;
+		} else if (this.clicked && this.clicked.parent) {
+			if (event.ctrlKey && evt.button === 0) {
+				this.highlighted = this.clicked = this.add(this.clicked.parent, this.clicked);
+			}
+			
+			this.tmpmp = this.convertPointToNodeTransform(this.clicked.parent, pos);
+			this.tmpst = {x: this.clicked.x, y: this.clicked.y, r: this.clicked.r, zx: this.clicked.zx, zy:this.clicked.zy};
+			this.tmpr  = this.tmpst.r - Math.atan2(pos.y - this.tmpst.y, pos.x - this.tmpst.x) / Math.PI * 180;
+			
+			if (this.onchange) this.onchange(this.clean(this.copy(this.root, true)));
+			this.debugCycle();
+			
+			if (this.onselect) {
+				var i;
+				for (i in this.highlighted.parent) {
+					if (this.highlighted.parent[i] === this.highlighted) break;
+				}
+				this.onselect(i);
+			}
+		}
+	};
+
+	// движение мыши с нажатием
+	this.drag = function(evt) {
+		var pos = this.getMousePos(this.canvas, evt);
+		this.mousemove = pos;
+		
+		if (evt.button === 2) {
+			this.root.x = pos.x + this.tmpoffset.x;
+			this.root.y = pos.y + this.tmpoffset.y;
+		} else if (this.clicked && this.clicked.parent) {
+			pos = this.convertPointToNodeTransform(this.clicked.parent, pos);
+
+			if (event.altKey) {
+				var dx1 = this.tmpmp.x - this.tmpst.x;
+				var dy1 = this.tmpmp.y - this.tmpst.y;
+				var d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+				var dx2 = pos.x - this.tmpst.x;
+				var dy2 = pos.y - this.tmpst.y;
+				var d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+				var d = d2 / d1;
+				this.clicked.zx = this.tmpst.zx * d;
+				this.clicked.zy = this.tmpst.zy * d;
+				var r = Math.atan2(pos.y - this.tmpst.y, pos.x - this.tmpst.x) / Math.PI * 180;
+				this.clicked.r = r + this.tmpr;
+			} else {
+				this.clicked.x = this.tmpst.x + (pos.x - this.tmpmp.x);
+				this.clicked.y = this.tmpst.y + (pos.y - this.tmpmp.y);
+				this.alignObject(this.clicked);
+			}
+		}
+		this.debugCycle();
+		evt.preventDefault();
+	};
+
+	// отпускание мыши
+	this.release = function(evt) {
+		var pos = this.getMousePos(this.canvas, evt);
+		this.mouseup = pos;
+		this.clicked = undefined;
+
+		if (this.highlighted) {
+			this.guide = undefined;
+			if (this.onchange) this.onchange(this.clean(this.copy(this.root, true)));
+			if (this.onselect) {
+				var i;
+				for (i in this.highlighted.parent) {
+					if (this.highlighted.parent[i] === this.highlighted) break;
+				}
+				this.onselect(i);
+			}
+			this.debugCycle();
+		}
+	};
+	
+	this.canvas.addEventListener('mousedown', function(evt) {self.click(evt)}, false);
+	this.canvas.addEventListener('mousemove', function(evt) {self.drag(evt)}, false);
+	this.canvas.addEventListener('mouseup',   function(evt) {self.release(evt)}, false);
+	this.canvas.addEventListener('mouseout',  function(evt) {self.release(evt)}, false);
+	this.canvas.addEventListener('touchstart', function(evt) {self.click(evt)}, false);
+	this.canvas.addEventListener('touchmove', function(evt) {self.drag(evt)}, false);
+	this.canvas.addEventListener('touchend',   function(evt) {self.release(evt)}, false);
+	this.canvas.addEventListener('touchleave',   function(evt) {self.release(evt)}, false);
+	this.canvas.addEventListener('touchcancel',   function(evt) {self.release(evt)}, false);
+	
+	this.onchange();
+}
+
+	/*// обработчик клика
+	Tree2d.prototype.click = function(evt) {
+		var pos = this.getMousePos(this.canvas, evt);
+		this.highlighted = this.clicked = this.getClickedObject(pos);
+		this.mousedown = pos;
+
+		if (this.edit) {
+			if (evt.button === 2) {
+				if (event.altKey && this.clicked && this.clicked.parent) this.del(this.clicked);
+				else this.tmpoffset = {x: this.root.x - pos.x, y: this.root.y - pos.y};
+				this.highlighted = this.clicked = undefined;
+				this.debugCycle();
+				evt.preventDefault();
+				return;
+			} else if (this.clicked && this.clicked.parent) {
+				if (event.ctrlKey && evt.button === 0) {
+					this.highlighted = this.clicked = this.add(this.clicked.parent, this.clicked);
+				}
+
+				this.tmpmp = this.convertPointToNodeTransform(this.clicked.parent, pos);
+				this.tmpst = {x: this.clicked.x, y: this.clicked.y, r: this.clicked.r, zx: this.clicked.zx, zy:this.clicked.zy};
+				this.tmpr  = this.tmpst.r - Math.atan2(pos.y - this.tmpst.y, pos.x - this.tmpst.x) / Math.PI * 180;
+
+				if (this.onchange) this.onchange(this.clean(this.copy(this.root, true)));
+				this.debugCycle();
+
+				if (this.onselect) {
+					var i;
+					for (i in this.highlighted.parent) {
+						if (this.highlighted.parent[i] === this.highlighted) break;
+					}
+					this.onselect(i);
+				}
+			}
+		}
+	};
+
+	// движение мыши с нажатием
+	Tree2d.prototype.drag = function(evt) {
+		var pos = this.getMousePos(this.canvas, evt);
+		this.mousemove = pos;
+
+		if (this.edit) {
+			if (evt.button === 2) {
+				this.root.x = pos.x + this.tmpoffset.x;
+				this.root.y = pos.y + this.tmpoffset.y;
+			} else if (this.clicked && this.clicked.parent) {
+				pos = this.convertPointToNodeTransform(this.clicked.parent, pos);
+
+				if (event.altKey) {
+					var dx1 = this.tmpmp.x - this.tmpst.x;
+					var dy1 = this.tmpmp.y - this.tmpst.y;
+					var d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+					var dx2 = pos.x - this.tmpst.x;
+					var dy2 = pos.y - this.tmpst.y;
+					var d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+					var d = d2 / d1;
+					this.clicked.zx = this.tmpst.zx * d;
+					this.clicked.zy = this.tmpst.zy * d;
+					var r = Math.atan2(pos.y - this.tmpst.y, pos.x - this.tmpst.x) / Math.PI * 180;
+					this.clicked.r = r + this.tmpr;
+				} else {
+					this.clicked.x = this.tmpst.x + (pos.x - this.tmpmp.x);
+					this.clicked.y = this.tmpst.y + (pos.y - this.tmpmp.y);
+					this.alignObject(this.clicked);
+				}
+			}
+			this.debugCycle();
+		}
+		evt.preventDefault();
+	};
+
+	// отпускание мыши
+	Tree2d.prototype.release = function(evt) {
+		var pos = this.getMousePos(this.canvas, evt);
+		this.mouseup = pos;
+		this.clicked = undefined;
+
+		if (this.edit && this.highlighted) {
+			this.guide = undefined;
+			if (this.onchange) this.onchange(this.clean(this.copy(this.root, true)));
+			if (this.onselect) {
+				var i;
+				for (i in this.highlighted.parent) {
+					if (this.highlighted.parent[i] === this.highlighted) break;
+				}
+				this.onselect(i);
+			}
+			this.debugCycle();
+		}
+	};*/
 
 
 window.Tree2d = Tree2d;
