@@ -35,10 +35,22 @@ function Tree2d(container, root, editorContainer) {
 	this.ctx.font = "bold 20px Arial";
 	
 	if (typeof root === 'string') root = JSON.parse(root);
+	root = root || {x:0, y:0, r:0, zx:1, zy:1, a:1};
 	this.root = root;
 	this.init(root);
 	this.canvas.width = root.w;
 	this.canvas.height = root.h;
+	
+	var self = this;
+	this.canvas.addEventListener('mousedown', function(evt) {self.click(evt)}, false);
+	this.canvas.addEventListener('mousemove', function(evt) {self.drag(evt)}, false);
+	this.canvas.addEventListener('mouseup',   function(evt) {self.release(evt)}, false);
+	this.canvas.addEventListener('mouseout',  function(evt) {self.release(evt)}, false);
+	this.canvas.addEventListener('touchstart', function(evt) {self.click(evt)}, false);
+	this.canvas.addEventListener('touchmove', function(evt) {self.drag(evt)}, false);
+	this.canvas.addEventListener('touchend',   function(evt) {self.release(evt)}, false);
+	this.canvas.addEventListener('touchleave',   function(evt) {self.release(evt)}, false);
+	this.canvas.addEventListener('touchcancel',   function(evt) {self.release(evt)}, false);
 	
 	if (editorContainer) {
 		this.createEditorFeatures(editorContainer);
@@ -112,7 +124,7 @@ Tree2d.prototype.cycle = function() {
 	
 	n = this.root;
 	while (n) {
-		if (n.a && n.a < 1 && n.updateCB) {
+		if (n.a && n.a <= 1 && n.updateCB) {
 			try {
 				n.updateCB(n, this);
 			} catch (e) {
@@ -123,7 +135,7 @@ Tree2d.prototype.cycle = function() {
 				this.changeEditMode('off');
 			}
 		}
-		if (n.a && n.a < 1 && n.child) {
+		if (n.a && n.a <= 1 && n.child) {
 			n = n.child;
 		} else {
 			while (n) {
@@ -663,6 +675,27 @@ Tree2d.prototype.pnpoly = function(npol, xp, yp, x, y) {
 	return c;
 };
 
+// обработчик клика
+Tree2d.prototype.click = function(evt) {
+	var pos = this.getMousePos(this.canvas, evt);
+	this.highlighted = this.clicked = this.getClickedObject(pos);
+	this.mousedown = pos;
+};
+
+// движение мыши с нажатием
+Tree2d.prototype.drag = function(evt) {
+	var pos = this.getMousePos(this.canvas, evt);
+	this.mousemove = pos;
+	evt.preventDefault();
+};
+
+// отпускание мыши
+Tree2d.prototype.release = function(evt) {
+	var pos = this.getMousePos(this.canvas, evt);
+	this.mouseup = pos;
+	this.clicked = undefined;
+};
+
 // объект с именем n.src типа теперь потомок объекта n1, но на самом деле нет
 Tree2d.prototype.link = function(n) {
 	if (n && n.src) {
@@ -947,14 +980,14 @@ Tree2d.prototype.createEditorFeatures = function(container) {
 	this.testRun = function() {
 		var text = JSON.stringify(this.clean(this.copy(this.root)));
 		var tab = window.open('', 'myconsole', 'width=350,height=250,menubar=0,toolbar=1,status=0,scrollbars=1,resizable=1');
-		tab.document.writeln(
-			'<html><head><title>Tree2d: Test Run</title><script type="text/javascript" src="tree2d.js"></script></head>'
+		text = '<html><head><title>Tree2d: Test Run</title><script type="text/javascript" src="tree2d.js"></script></head>'
 			+'<body bgcolor=white onLoad="self.focus()">'
 			+'<canvas id="mycanvas"></canvas>'
 			+"<script>txt = '"+text
-			+"';new Tree2d(document.getElementById('mycanvas'), txt)</script>"
-			+'</body></html>'
-		);
+			+"'; \nvar tree = new Tree2d(document.getElementById('mycanvas'), txt); \nfunction render() { \ntree.cycle(); \nrequestAnimationFrame(render);} \nrender();</script>"
+			+'</body></html>';
+		tab.document.writeln(text);
+		console.log(text);
 		tab.document.close();
 	};
 	
@@ -1429,110 +1462,8 @@ Tree2d.prototype.createEditorFeatures = function(container) {
 		}
 	};
 	
-	this.canvas.addEventListener('mousedown', function(evt) {self.click(evt)}, false);
-	this.canvas.addEventListener('mousemove', function(evt) {self.drag(evt)}, false);
-	this.canvas.addEventListener('mouseup',   function(evt) {self.release(evt)}, false);
-	this.canvas.addEventListener('mouseout',  function(evt) {self.release(evt)}, false);
-	this.canvas.addEventListener('touchstart', function(evt) {self.click(evt)}, false);
-	this.canvas.addEventListener('touchmove', function(evt) {self.drag(evt)}, false);
-	this.canvas.addEventListener('touchend',   function(evt) {self.release(evt)}, false);
-	this.canvas.addEventListener('touchleave',   function(evt) {self.release(evt)}, false);
-	this.canvas.addEventListener('touchcancel',   function(evt) {self.release(evt)}, false);
-	
 	this.onchange();
-}
-
-	/*// обработчик клика
-	Tree2d.prototype.click = function(evt) {
-		var pos = this.getMousePos(this.canvas, evt);
-		this.highlighted = this.clicked = this.getClickedObject(pos);
-		this.mousedown = pos;
-
-		if (this.edit) {
-			if (evt.button === 2) {
-				if (event.altKey && this.clicked && this.clicked.parent) this.del(this.clicked);
-				else this.tmpoffset = {x: this.root.x - pos.x, y: this.root.y - pos.y};
-				this.highlighted = this.clicked = undefined;
-				this.debugCycle();
-				evt.preventDefault();
-				return;
-			} else if (this.clicked && this.clicked.parent) {
-				if (event.ctrlKey && evt.button === 0) {
-					this.highlighted = this.clicked = this.add(this.clicked.parent, this.clicked);
-				}
-
-				this.tmpmp = this.convertPointToNodeTransform(this.clicked.parent, pos);
-				this.tmpst = {x: this.clicked.x, y: this.clicked.y, r: this.clicked.r, zx: this.clicked.zx, zy:this.clicked.zy};
-				this.tmpr  = this.tmpst.r - Math.atan2(pos.y - this.tmpst.y, pos.x - this.tmpst.x) / Math.PI * 180;
-
-				if (this.onchange) this.onchange(this.clean(this.copy(this.root, true)));
-				this.debugCycle();
-
-				if (this.onselect) {
-					var i;
-					for (i in this.highlighted.parent) {
-						if (this.highlighted.parent[i] === this.highlighted) break;
-					}
-					this.onselect(i);
-				}
-			}
-		}
-	};
-
-	// движение мыши с нажатием
-	Tree2d.prototype.drag = function(evt) {
-		var pos = this.getMousePos(this.canvas, evt);
-		this.mousemove = pos;
-
-		if (this.edit) {
-			if (evt.button === 2) {
-				this.root.x = pos.x + this.tmpoffset.x;
-				this.root.y = pos.y + this.tmpoffset.y;
-			} else if (this.clicked && this.clicked.parent) {
-				pos = this.convertPointToNodeTransform(this.clicked.parent, pos);
-
-				if (event.altKey) {
-					var dx1 = this.tmpmp.x - this.tmpst.x;
-					var dy1 = this.tmpmp.y - this.tmpst.y;
-					var d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
-					var dx2 = pos.x - this.tmpst.x;
-					var dy2 = pos.y - this.tmpst.y;
-					var d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-					var d = d2 / d1;
-					this.clicked.zx = this.tmpst.zx * d;
-					this.clicked.zy = this.tmpst.zy * d;
-					var r = Math.atan2(pos.y - this.tmpst.y, pos.x - this.tmpst.x) / Math.PI * 180;
-					this.clicked.r = r + this.tmpr;
-				} else {
-					this.clicked.x = this.tmpst.x + (pos.x - this.tmpmp.x);
-					this.clicked.y = this.tmpst.y + (pos.y - this.tmpmp.y);
-					this.alignObject(this.clicked);
-				}
-			}
-			this.debugCycle();
-		}
-		evt.preventDefault();
-	};
-
-	// отпускание мыши
-	Tree2d.prototype.release = function(evt) {
-		var pos = this.getMousePos(this.canvas, evt);
-		this.mouseup = pos;
-		this.clicked = undefined;
-
-		if (this.edit && this.highlighted) {
-			this.guide = undefined;
-			if (this.onchange) this.onchange(this.clean(this.copy(this.root, true)));
-			if (this.onselect) {
-				var i;
-				for (i in this.highlighted.parent) {
-					if (this.highlighted.parent[i] === this.highlighted) break;
-				}
-				this.onselect(i);
-			}
-			this.debugCycle();
-		}
-	};*/
+};
 
 
 window.Tree2d = Tree2d;
