@@ -59,38 +59,6 @@ function Tree2d(container, root, editorContainer) {
 
 Tree2d.prototype.images = {};
 
-/*// переключает режим работы движка (редактирование/игра)
-Tree2d.prototype.changeEditMode = function(edit) {
-	if (edit === true || edit === 'on') {
-		this.edit = true;
-		if (this.run) {
-			clearInterval(this.run);
-			delete this.run;
-		}
-		if (this.backup) this.root = this.backup;
-		this.debugCycle();
-	} else if (edit === false || edit === 'off') {
-		this.edit = false;
-		this.backup = this.root;
-		this.root = this.copy(this.backup, true); // для ф-ии reset
-		this.root.x = this.root.y = 0;
-		this.root.zx = this.root.zy = 1;
-		this.init(this.root);
-		this.run = setInterval(
-			(function(self) {
-				return function() {
-					self.cycle();
-				}
-			})(this),
-			1000 / 60
-		);
-	} else {
-		this.changeEditMode(!this.edit);
-	}
-	//console.log(this);
-	return this.edit;
-}*/
-
 // действия за 1 кадр: отрисовка и апдейт
 Tree2d.prototype.cycle = function() {
 	var n = this.root;
@@ -575,79 +543,6 @@ Tree2d.prototype.getMousePos = function(canvas, evt) {
 		};
 	}
 	return pos;
-};
-
-// находит объект, относительно которого можно выровнять объект n
-Tree2d.prototype.alignObject = function(n, minh, minv) {
-	var p = n.parent, c = p.child, guide = {};
-	minh = minh || 20;
-	minv = minv || 20;
-	
-	if (Math.abs(n.x) < minh) {
-		guide.horisontal = p;
-	}
-	if (Math.abs(n.y) < minv) {
-		guide.vertical = p;
-	}
-	
-	if (!n.r) {
-		if (Math.abs(-n.x - n.w / 2) < minh) {
-			guide.boundleft = p;
-		}
-		if (Math.abs(n.x - n.w / 2) < minh) {
-			guide.boundright = p;
-		}
-		if (Math.abs(-n.y - n.h / 2) < minv) {
-			guide.boundtop = p;
-		}
-		if (Math.abs(n.y - n.h / 2) < minv) {
-			guide.boundbottom = p;
-		}
-	}
-	
-	if (guide.horisontal) n.x = 0;
-	else if (guide.boundleft) n.x = -n.w / 2;
-	else if (guide.boundright) n.x = n.w / 2;
-	if (guide.vertical) n.y = 0;
-	else if (guide.boundtop) n.y = -n.h / 2;
-	else if (guide.boundbottom) n.y = n.h / 2;
-	
-	guide = {};
-	
-	while (c) {
-		if (n != c) {
-			if (Math.abs(n.x - c.x) < minh) {
-				guide.horisontal = c;
-			}
-			if (Math.abs(n.y - c.y) < minv) {
-				guide.vertical = c;
-			}
-			if (!n.r && !c.r) {
-				if (Math.abs((n.x - n.w / 2) - (c.x + c.w / 2)) < minh) {
-					guide.boundright = c;
-				}
-				if (Math.abs((n.x + n.w / 2) - (c.x - c.w / 2)) < minh) {
-					guide.boundleft = c;
-				}
-				if (Math.abs((n.y - n.h / 2) - (c.y + c.h / 2)) < minv) {
-					guide.boundbottom = c;
-				}
-				if (Math.abs((n.y + n.h / 2) - (c.y - c.h / 2)) < minv) {
-					guide.boundtop = c;
-				}
-			}
-		}
-		c = c.next;
-	}
-	
-	if (guide.horisontal) n.x = guide.horisontal.x;
-	else if (guide.boundleft) n.x = guide.boundleft.x - guide.boundleft.w / 2 - n.w / 2;
-	else if (guide.boundright) n.x = guide.boundright.x + guide.boundright.w / 2 + n.w / 2;
-	if (guide.vertical) n.y = guide.vertical.y;
-	else if (guide.boundtop) n.y = guide.boundtop.y - guide.boundtop.h / 2 - n.h / 2;
-	else if (guide.boundbottom) n.y = guide.boundbottom.y + guide.boundbottom.h / 2 + n.h / 2;
-	
-	this.guide = guide;
 };
 
 // генерирует JSON - структуру того, что в редакторе, и выводит в лог
@@ -1303,6 +1198,79 @@ Tree2d.prototype.createEditorFeatures = function(container) {
 		addBtn.onclick = function(){self.addParam(name.value, addLabel.value)};
 		values.appendChild(addBtn);
 	}
+	
+	// находит объект, относительно которого можно выровнять объект n
+	this.alignObject = function(n, minh, minv) {
+		var p = n.parent, c = p.child, guide = {};
+		minh = minh || 20;
+		minv = minv || 20;
+
+		if (Math.abs(n.x) < minh) {
+			guide.horisontal = p;
+		}
+		if (Math.abs(n.y) < minv) {
+			guide.vertical = p;
+		}
+
+		if (!n.r) {
+			if (Math.abs(-n.x - n.w / 2) < minh) {
+				guide.boundleft = p;
+			}
+			if (Math.abs(n.x - n.w / 2) < minh) {
+				guide.boundright = p;
+			}
+			if (Math.abs(-n.y - n.h / 2) < minv) {
+				guide.boundtop = p;
+			}
+			if (Math.abs(n.y - n.h / 2) < minv) {
+				guide.boundbottom = p;
+			}
+		}
+
+		if (guide.horisontal) n.x = 0;
+		else if (guide.boundleft) n.x = -n.w / 2;
+		else if (guide.boundright) n.x = n.w / 2;
+		if (guide.vertical) n.y = 0;
+		else if (guide.boundtop) n.y = -n.h / 2;
+		else if (guide.boundbottom) n.y = n.h / 2;
+
+		guide = {};
+
+		while (c) {
+			if (n != c) {
+				if (Math.abs(n.x - c.x) < minh) {
+					guide.horisontal = c;
+				}
+				if (Math.abs(n.y - c.y) < minv) {
+					guide.vertical = c;
+				}
+				if (!n.r && !c.r) {
+					if (Math.abs((n.x - n.w / 2) - (c.x + c.w / 2)) < minh) {
+						guide.boundright = c;
+					}
+					if (Math.abs((n.x + n.w / 2) - (c.x - c.w / 2)) < minh) {
+						guide.boundleft = c;
+					}
+					if (Math.abs((n.y - n.h / 2) - (c.y + c.h / 2)) < minv) {
+						guide.boundbottom = c;
+					}
+					if (Math.abs((n.y + n.h / 2) - (c.y - c.h / 2)) < minv) {
+						guide.boundtop = c;
+					}
+				}
+			}
+			c = c.next;
+		}
+
+		if (guide.horisontal) n.x = guide.horisontal.x;
+		else if (guide.boundleft) n.x = guide.boundleft.x - guide.boundleft.w / 2 - n.w / 2;
+		else if (guide.boundright) n.x = guide.boundright.x + guide.boundright.w / 2 + n.w / 2;
+		if (guide.vertical) n.y = guide.vertical.y;
+		else if (guide.boundtop) n.y = guide.boundtop.y - guide.boundtop.h / 2 - n.h / 2;
+		else if (guide.boundbottom) n.y = guide.boundbottom.y + guide.boundbottom.h / 2 + n.h / 2;
+
+		this.guide = guide;
+	};
 	
 	this.debugCycle = function() {
 		var n = this.root;
